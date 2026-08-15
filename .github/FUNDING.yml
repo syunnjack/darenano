@@ -1,0 +1,6 @@
+# このファイルがあると、リポジトリのページに Sponsor ボタンが出ます。
+# GitHub Sponsors を有効にしたら、次の行のコメントを外してください。
+# github: [syunnjack]
+custom:
+  - "https://syunnjack.dev/store"
+  - "https://wangan-base.booth.pm"
