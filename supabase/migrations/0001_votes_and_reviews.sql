@@ -109,5 +109,14 @@ returns void language sql security definer set search_path = public as $$
      where id = review_id;
 $$;
 
+-- PostgreSQL では関数の実行権限が既定で PUBLIC に付く。
+-- anon と authenticated から取り消すだけでは PUBLIC 経由で誰でも呼べてしまう。
+-- 実際、これを書き忘れていたときは匿名キーで approve_review() を呼べてしまい、
+-- 投稿者が自分の口コミを承認済みにできる状態だった。PUBLIC から取り消すこと。
+revoke execute on function public.approve_review(bigint) from public;
+revoke execute on function public.reject_review(bigint)  from public;
 revoke execute on function public.approve_review(bigint) from anon, authenticated;
 revoke execute on function public.reject_review(bigint)  from anon, authenticated;
+
+-- 今後この方式で関数を足しても、同じ穴が開かないようにしておく。
+alter default privileges in schema public revoke execute on functions from public;
