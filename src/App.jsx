@@ -206,6 +206,11 @@ function App() {
           <a href="/privacy/">プライバシーポリシー</a>
           <a href="mailto:info@darekore.jp">お問い合わせ</a>
         </nav>
+        <p className="credit">
+          {/* DUGA ウェブサービスの規約で表示が義務づけられているクレジット。
+              指定のHTMLをそのまま出す必要があるため、属性を足さない。 */}
+          <a href="https://click.duga.jp/aff/api/21786-01" target="_blank">Powered by DUGAウェブサービス</a>
+        </p>
         <p className="copy">© {new Date().getFullYear()} この子だれ？</p>
       </footer>
     </main>

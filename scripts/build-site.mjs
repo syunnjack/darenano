@@ -27,6 +27,11 @@ const CONTACT = 'info@darekore.jp'
 // （FANZA のアフィリエイトIDも、API が返す一覧URLに含まれている。）
 const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 
+// DUGA ウェブサービスの利用規約で表示が義務づけられているクレジット。
+// 「規定のHTMLソースを利用してください。ソースや画像の改変はできません」と
+// されているため、rel などを足さずそのままの形で出す。
+const DUGA_CREDIT = `<a href="https://click.duga.jp/aff/api/${DUGA_AGENT_ID}-01" target="_blank">Powered by DUGAウェブサービス</a>`
+
 // 五十音の見出しと、そこに入れる読みの頭文字。濁音・半濁音は清音にまとめる。
 const KANA_ROWS = [
   ['あ', [['あ', 'あ'], ['い', 'い'], ['う', 'うゔ'], ['え', 'え'], ['お', 'お']]],
@@ -304,6 +309,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
         <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p class="credit">${DUGA_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -417,6 +423,7 @@ function shell({ title, description, canonical, crumbs, body }) {
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
         <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p class="credit">${DUGA_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -465,6 +472,7 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .name-list a:hover { color:#8b4054; text-decoration:underline; }
 footer { margin-top:44px; border-top:1px solid #ecdfe2; padding-top:16px; font-size:13px; color:#7a7484; }
 footer a { color:#8b4054; }
+.credit { margin-top:10px; }
 .adult { font-weight:700; color:#b0453c; }
 @media (prefers-color-scheme: dark) {
   body { background:#16141a; color:#ece8f0; }
