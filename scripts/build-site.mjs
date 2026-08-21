@@ -130,17 +130,18 @@ function profileOf(person) {
   return entries
 }
 
+/** 「2019-03-18」を「2019年3月」にする。 */
+function monthLabel(iso) {
+  const [year, month] = String(iso).split('-')
+  return `${Number(year)}年${Number(month)}月`
+}
+
 /** 「2019年3月 〜 2026年3月（14作品）」の形にする。 */
 function duraSpan(duga) {
   if (!duga?.firstOpenedOn || !duga?.lastOpenedOn) return ''
 
-  const label = (iso) => {
-    const [year, month] = iso.split('-')
-    return `${Number(year)}年${Number(month)}月`
-  }
-
-  const first = label(duga.firstOpenedOn)
-  const last = label(duga.lastOpenedOn)
+  const first = monthLabel(duga.firstOpenedOn)
+  const last = monthLabel(duga.lastOpenedOn)
   const works = `${duga.works.toLocaleString('ja-JP')}作品`
 
   return first === last ? `${first}（${works}）` : `${first} 〜 ${last}（${works}）`
@@ -244,6 +245,15 @@ function renderPage(person, { profile, sources, related, indexable }) {
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
 
+  const historyHtml = person.nameHistory?.length
+    ? `<section class="history"><h2>名義ごとの収録</h2>
+        <table class="profile"><tbody>${person.nameHistory
+          .map((h) => `<tr><th>${escapeHtml(h.name)}</th><td>${escapeHtml(monthLabel(h.first))} 〜 ${escapeHtml(monthLabel(h.last))}（${h.works.toLocaleString('ja-JP')}作品）</td></tr>`)
+          .join('')}</tbody></table>
+        <p class="confirmed">DUGA に残っている作品の公開日から並べたものです。改名した時期そのものではありません。</p>
+      </section>`
+    : ''
+
   const relatedHtml = related.length
     ? `<section class="related"><h2>読みが近い方</h2><div class="chips">${related
         .map((r) => `<a href="/actress/${r.slug}/">${escapeHtml(r.name)}</a>`)
@@ -288,6 +298,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
         ${sourcesHtml}
         <p class="confirmed">各サービスの API が公開している情報をそのまま載せています。取得時期は<a href="/actress/">五十音索引</a>に記載しています。</p>
       </section>
+      ${historyHtml}
       ${relatedHtml}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
@@ -439,7 +450,7 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
 .confirmed { font-size:13px; color:#8a838f; margin:6px 0 0; }
-.related { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.related, .history { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
 .kana-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 24px; }
@@ -511,6 +522,30 @@ async function main() {
   }
 
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)
+
+  // 名義ごとの収録期間。改名して名前が変わっている人は、
+  // それぞれの名前で作品が残っているので、いつ頃どの名前だったかが分かる。
+  for (const person of people) {
+    const names = [person.name, ...(person.fanza?.aliases ?? [])]
+    const history = []
+
+    for (const name of names) {
+      const found = dugaProducts.get(normaliseName(name))
+      if (!found?.firstOpenedOn) continue
+      history.push({
+        name,
+        works: found.works,
+        first: found.firstOpenedOn,
+        last: found.lastOpenedOn,
+      })
+    }
+
+    // 2つ以上の名義で作品が残っているときだけ、改名歴として意味がある。
+    if (history.length > 1) {
+      history.sort((a, b) => a.first.localeCompare(b.first))
+      person.nameHistory = history
+    }
+  }
 
   // すでに公開してあったURLは、内容が薄くても残す（404 を作らないため）。
   let published = new Set()
