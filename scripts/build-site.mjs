@@ -27,6 +27,16 @@ const CONTACT = 'info@darekore.jp'
 // （FANZA のアフィリエイトIDも、API が返す一覧URLに含まれている。）
 const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 
+// DUGA ウェブサービスの利用規約で表示が義務づけられているクレジット。
+// 「規定のHTMLソースを利用してください。ソースや画像の改変はできません」と
+// されているため、rel などを足さずそのままの形で出す。
+const DUGA_CREDIT = `<a href="https://click.duga.jp/aff/api/${DUGA_AGENT_ID}-01" target="_blank">Powered by DUGAウェブサービス</a>`
+
+// 投票と口コミの保存先。匿名キーは公開してよい値で、守りはデータベース側の RLS。
+// 未設定のときは、投稿欄を出さずにページを作る。
+const SUPABASE_URL = process.env.SUPABASE_URL || ''
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || ''
+
 // 五十音の見出しと、そこに入れる読みの頭文字。濁音・半濁音は清音にまとめる。
 const KANA_ROWS = [
   ['あ', [['あ', 'あ'], ['い', 'い'], ['う', 'うゔ'], ['え', 'え'], ['お', 'お']]],
@@ -117,7 +127,34 @@ function profileOf(person) {
   const size = ['bust', 'waist', 'hip'].map((key) => source[key]).filter(Boolean)
   if (size.length === 3) entries.push(['スリーサイズ', `B${size[0]} / W${size[1]} / H${size[2]}`])
 
+  // DUGA に収録されている作品の、公開日のいちばん古いものと新しいもの。
+  // 本人の活動期間そのものではなく、あくまで収録の範囲。
+  const span = duraSpan(person.duga)
+  if (span) entries.push(['DUGAでの収録', span])
+
+  // 出演の多いレーベル。露骨な名称のものは取得側で除いてある。
+  if (person.duga?.labels?.length) {
+    entries.push(['主なレーベル', person.duga.labels.join('、')])
+  }
+
   return entries
+}
+
+/** 「2019-03-18」を「2019年3月」にする。 */
+function monthLabel(iso) {
+  const [year, month] = String(iso).split('-')
+  return `${Number(year)}年${Number(month)}月`
+}
+
+/** 「2019年3月 〜 2026年3月（14作品）」の形にする。 */
+function duraSpan(duga) {
+  if (!duga?.firstOpenedOn || !duga?.lastOpenedOn) return ''
+
+  const first = monthLabel(duga.firstOpenedOn)
+  const last = monthLabel(duga.lastOpenedOn)
+  const works = `${duga.works.toLocaleString('ja-JP')}作品`
+
+  return first === last ? `${first}（${works}）` : `${first} 〜 ${last}（${works}）`
 }
 
 function sourcesOf(person, confirmedOn) {
@@ -191,8 +228,12 @@ function renderPage(person, { profile, sources, related, indexable }) {
   // 作品データCSVにも、あるのは商品ページのURLだけ）。氏名での検索URLを組んでみたが
   // 該当なしになったため、いちばん新しい出演作品のページへ案内する。
   if (person.duga?.productId) {
+    const opened = person.duga.productOpenedOn
+      ? `（${person.duga.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日公開`)}）`
+      : ''
+
     works.push([
-      'DUGA で最新の出演作品を見る',
+      `DUGA で最新の出演作品を見る${opened}`,
       `https://click.duga.jp/ppv/${encodeURIComponent(person.duga.productId)}/${DUGA_AGENT_ID}-01`,
     ])
   }
@@ -213,6 +254,15 @@ function renderPage(person, { profile, sources, related, indexable }) {
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
+
+  const historyHtml = person.nameHistory?.length
+    ? `<section class="history"><h2>名義ごとの収録</h2>
+        <table class="profile"><tbody>${person.nameHistory
+          .map((h) => `<tr><th>${escapeHtml(h.name)}</th><td>${escapeHtml(monthLabel(h.first))} 〜 ${escapeHtml(monthLabel(h.last))}（${h.works.toLocaleString('ja-JP')}作品）</td></tr>`)
+          .join('')}</tbody></table>
+        <p class="confirmed">DUGA に残っている作品の公開日から並べたものです。改名した時期そのものではありません。</p>
+      </section>`
+    : ''
 
   const relatedHtml = related.length
     ? `<section class="related"><h2>読みが近い方</h2><div class="chips">${related
@@ -245,6 +295,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
     <script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>
     <link rel="stylesheet" href="/actress/page.css" />
+    <script defer src="/assets/ugc.js"></script>
   </head>
   <body>
     <div class="wrap">
@@ -258,11 +309,17 @@ function renderPage(person, { profile, sources, related, indexable }) {
         ${sourcesHtml}
         <p class="confirmed">各サービスの API が公開している情報をそのまま載せています。取得時期は<a href="/actress/">五十音索引</a>に記載しています。</p>
       </section>
+      ${historyHtml}
+      <section id="ugc" class="ugc"
+               data-slug="${escapeHtml(person.slug)}"
+               data-api="${escapeHtml(SUPABASE_URL)}"
+               data-key="${escapeHtml(SUPABASE_ANON_KEY)}"></section>
       ${relatedHtml}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p class="credit">${DUGA_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -352,6 +409,28 @@ function renderHeadPage(head, members, confirmedOn, groups) {
   })
 }
 
+/** 当サイトの投票数によるランキング。 */
+function renderRankingPage() {
+  const description = '当サイトで押された投票の数で並べたランキングです。'
+    + '外部の人気度ではなく、このサイトの投票数です。'
+
+  return shell({
+    title: `投票ランキング｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/ranking/`,
+    crumbs: '投票ランキング',
+    body: `
+      <h1>投票ランキング</h1>
+      <p class="reading">${escapeHtml(description)}出演者のページから投票できます。</p>
+      <section id="ranking"
+               data-api="${escapeHtml(SUPABASE_URL)}"
+               data-key="${escapeHtml(SUPABASE_ANON_KEY)}">
+        <p class="note">読み込んでいます…</p>
+      </section>
+      <script defer src="/assets/ranking.js"></script>`,
+  })
+}
+
 /** 索引まわりのページの、共通のひな型。 */
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
@@ -375,7 +454,8 @@ function shell({ title, description, canonical, crumbs, body }) {
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p class="credit">${DUGA_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -409,7 +489,7 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
 .confirmed { font-size:13px; color:#8a838f; margin:6px 0 0; }
-.related { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.related, .history { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
 .kana-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 24px; }
@@ -424,6 +504,28 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .name-list a:hover { color:#8b4054; text-decoration:underline; }
 footer { margin-top:44px; border-top:1px solid #ecdfe2; padding-top:16px; font-size:13px; color:#7a7484; }
 footer a { color:#8b4054; }
+.credit { margin-top:10px; }
+.ugc { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.vote-box { display:flex; align-items:center; gap:12px; margin:12px 0 4px; }
+.vote { background:#8b4054; color:#fff; border:0; border-radius:8px; padding:10px 20px; font-size:15px; font-weight:700; cursor:pointer; }
+.vote[disabled] { background:#c9c2cf; cursor:default; }
+.vote-count { font-size:15px; color:#5a5566; }
+.reviews { list-style:none; padding:0; margin:10px 0; }
+.reviews li { background:#fff; border:1px solid #ecdfe2; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+.review-body { margin:0 0 6px; font-size:15px; white-space:pre-wrap; }
+.review-meta { margin:0; font-size:12px; color:#8a838f; }
+.review-form { display:flex; flex-direction:column; gap:6px; margin-top:16px; }
+.review-form label { font-size:13px; color:#6b6474; }
+.review-form input, .review-form textarea { font:inherit; padding:10px 12px; border:1px solid #ecdfe2; border-radius:8px; background:#fff; color:inherit; }
+.review-form .button { align-self:flex-start; border:0; cursor:pointer; }
+.note { font-size:13px; color:#8a838f; }
+.rank-list { padding-left:1.6em; }
+.rank-list li { margin-bottom:6px; font-size:15px; }
+.rank-list a { color:#8b4054; text-decoration:none; }
+.rank-count { font-size:13px; color:#8a838f; margin-left:8px; }
+@media (prefers-color-scheme: dark) {
+  .reviews li, .review-form input, .review-form textarea { background:#211e28; border-color:#332d3d; }
+}
 .adult { font-weight:700; color:#b0453c; }
 @media (prefers-color-scheme: dark) {
   body { background:#16141a; color:#ece8f0; }
@@ -474,9 +576,37 @@ async function main() {
     if (!found) continue
     record.productId = found.productId
     record.works = found.works       // CSV のほうが収録範囲が広い
+    record.firstOpenedOn = found.firstOpenedOn
+    record.lastOpenedOn = found.lastOpenedOn
+    record.productOpenedOn = found.productOpenedOn
+    record.labels = found.labels
   }
 
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)
+
+  // 名義ごとの収録期間。改名して名前が変わっている人は、
+  // それぞれの名前で作品が残っているので、いつ頃どの名前だったかが分かる。
+  for (const person of people) {
+    const names = [person.name, ...(person.fanza?.aliases ?? [])]
+    const history = []
+
+    for (const name of names) {
+      const found = dugaProducts.get(normaliseName(name))
+      if (!found?.firstOpenedOn) continue
+      history.push({
+        name,
+        works: found.works,
+        first: found.firstOpenedOn,
+        last: found.lastOpenedOn,
+      })
+    }
+
+    // 2つ以上の名義で作品が残っているときだけ、改名歴として意味がある。
+    if (history.length > 1) {
+      history.sort((a, b) => a.first.localeCompare(b.first))
+      person.nameHistory = history
+    }
+  }
 
   // すでに公開してあったURLは、内容が薄くても残す（404 を作らないため）。
   let published = new Set()
@@ -590,6 +720,11 @@ async function main() {
     await writeFile(path.join(dir, 'index.html'), renderHeadPage(head, members, confirmedOn, indexGroups), 'utf8')
   }
 
+  // 当サイトの投票数によるランキング。中身は表示時に Supabase から読む。
+  const rankingDir = path.join(publicDir, 'ranking')
+  await mkdir(rankingDir, { recursive: true })
+  await writeFile(path.join(rankingDir, 'index.html'), renderRankingPage(), 'utf8')
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -625,6 +760,7 @@ async function main() {
   const entries = [
     `${SITE_URL}/`,
     `${SITE_URL}/actress/`,
+    `${SITE_URL}/ranking/`,
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),

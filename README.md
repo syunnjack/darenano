@@ -21,7 +21,7 @@ GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 |---|---|---|
 | FANZA ActressSearch API | `scripts/fetch-actresses.py` | 氏名・読み・別名義・生年月日・出身地・身長・血液型・趣味・写真 |
 | DUGA アフィリエイト Web サービス | `scripts/fetch-duga-performers.py` | 氏名・カナ・出演者ID |
-| DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先） |
+| DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先）・収録期間・主なレーベル |
 
 出力先は `public/data/`。ページの生成は `scripts/build-site.mjs`。
 
@@ -49,7 +49,62 @@ DUGA の API 制限は 60秒あたり60リクエスト。全商品を見るの�
 
 作品データCSV（`https://duga.jp/productcsv/`、認証不要・毎日12:30と18:30に更新）は
 ウェブサービスより収録が広い（CSV 238,872作品・45,194人 / API 195,824作品・8,865人）。
-作品数とリンク先はCSVから取る。出演者IDと読み仮名はCSVに無いので、ウェブサービス側から取る。
+作品数・リンク先・収録期間はCSVから取る。出演者IDと読み仮名はCSVに無いので、
+ウェブサービス側から取る。
+
+**レーベル名には露骨な語を含むものがある**（1,068種のうち30種ほど。「女排泄一門会」など）。
+`scripts/fetch-duga-csv.py` の `EXPLICIT` で除いている。「熟女」「人妻」のような
+ジャンル語は露骨な描写ではないので除いていない。除外後に表示できるレーベルがあるのは
+45,194人中45,119人。
+
+「DUGAでの収録」は、その人の作品のうち公開日がいちばん古いものと新しいものの範囲。
+**本人の活動期間そのものではない**ので、そう書かないこと。DUGAに無い時期の作品や、
+他社でのみ配信された作品は含まれない。
+
+## DUGA のクレジット表示（義務）
+
+DUGA ウェブサービスの規約で、**指定のクレジットの表示が義務**づけられている。
+全ページのフッタに次を出している。
+
+```html
+<a href="https://click.duga.jp/aff/api/21786-01" target="_blank">Powered by DUGAウェブサービス</a>
+```
+
+- **ソースの改変は認められていない。** `rel` などを足さない
+- 表示位置は自由だが、閲覧者に分かるように出す
+- DUGA が提供しているサイトだと誤解させる表示は禁止
+- **アプリケーションIDの申請内容と違うURLでの表示は認められない。**
+  申請時のURLが `https://darekore.jp` になっているか、管理画面の［編集］で確認すること
+
+規定を守らないと API の利用を止められることがある。
+
+## 投票と口コミ
+
+静的サイトなので投稿の保存先が無い。**Supabase**（東京リージョン）に置いている。
+
+- 定義: `supabase/migrations/0001_votes_and_reviews.sql`
+- 画面: `public/actress/ugc.js`（出演者ページ）、`public/ranking/ranking.js`
+- ビルド時に `SUPABASE_URL` と `SUPABASE_ANON_KEY` を埋め込む（GitHub Secrets）
+
+**匿名キーは公開してよい値**で、守りは RLS だけが担う。次の3つは必ず保つこと。
+
+1. 口コミは `status = 'approved'` のものしか読めない
+2. 投稿は必ず `pending` から始まる（投稿者が承認済みで入れられない）
+3. anon に update と delete のポリシーを作らない（後から書き換え・削除できない）
+
+**実在の人物についての書き込みなので、公開前に運営が確認する。**
+承認は Supabase の SQL Editor から。
+
+```sql
+-- 未承認の一覧
+select id, slug, nickname, body, created_at
+  from performer_reviews where status = 'pending' order by created_at;
+
+select approve_review(123);   -- 公開する
+select reject_review(123);    -- 公開しない
+```
+
+ランキングは**当サイトの投票数**で並べたもの。外部の人気度ではないと画面に明記している。
 
 ## 削除依頼
 

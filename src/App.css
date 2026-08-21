@@ -227,6 +227,10 @@
   color: var(--accent);
 }
 
+.credit {
+  margin: 0 0 8px;
+}
+
 .copy {
   margin: 0;
 }
