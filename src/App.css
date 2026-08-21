@@ -1,0 +1,232 @@
+.site {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 見出し帯 */
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.masthead nav a {
+  font-size: 14px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* 導入 */
+.hero {
+  padding: 36px 0 8px;
+}
+
+.hero h1 {
+  font-size: clamp(24px, 5vw, 36px);
+  line-height: 1.35;
+  margin: 0 0 12px;
+}
+
+.lead {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.search input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  color: inherit;
+}
+
+.search input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 一覧 */
+.results {
+  margin-top: 36px;
+}
+
+.results h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.count {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.name-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px 14px;
+}
+
+.name-list a {
+  display: block;
+  padding: 5px 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.name-list a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.name-list .reading {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.card-list a {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-list a:hover {
+  border-color: var(--accent);
+}
+
+.card-name {
+  display: block;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.card-reading {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.card-facts {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.more {
+  margin: 18px 0 0;
+  font-size: 14px;
+}
+
+.more a,
+.about a {
+  color: var(--accent);
+}
+
+.note {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* 説明 */
+.about {
+  margin-top: 44px;
+  border-top: 1px solid var(--rule);
+  padding-top: 8px;
+}
+
+.about h2 {
+  font-size: 17px;
+  margin: 20px 0 10px;
+}
+
+.about p {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.about .sources {
+  margin: 0 0 12px;
+  padding-left: 1.3em;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* 脚注 */
+.site-footer {
+  margin-top: 48px;
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.site-footer .adult {
+  font-weight: 700;
+  color: var(--warn);
+  margin: 0 0 12px;
+}
+
+.site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.site-footer a {
+  color: var(--accent);
+}
+
+.copy {
+  margin: 0;
+}

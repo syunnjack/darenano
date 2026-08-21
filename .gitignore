@@ -2,3 +2,13 @@ node_modules/
 dist/
 .env
 .env.local
+
+# 出演者ページはビルド時に生成する（scripts/build-site.mjs）。
+# 2万件以上あり、毎回すべて書き換わるので git には入れない。
+# 元になるデータ（public/data/*.json）だけを commit する。
+public/actress/
+public/kana/
+public/data/search-index.tsv
+public/data/featured.json
+public/data/*.tmp
+public/sitemap.xml

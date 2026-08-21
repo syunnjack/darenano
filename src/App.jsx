@@ -1,89 +1,215 @@
-import { useMemo, useState } from 'react'
-import { people } from './data/actresses.js'
-import './index.css'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import './App.css'
 
-// 名前の一部・読みの一部から絞り込むだけの画面。
-// 身長やカップ数などの属性は、出典が無いため持っていない。
-const SEARCH_URL = (name) =>
-  `https://www.dmm.co.jp/search/=/searchstr=${encodeURIComponent(name)}/`
+const MAX_RESULTS = 60
 
-export default function App() {
-  const [query, setQuery] = useState('')
+/** カタカナをひらがなに寄せ、空白を落とす。検索の突き合わせ用。 */
+function normalise(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[ァ-ヶ]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0x60))
+    .replace(/[\s　・･]/g, '')
+    .toLowerCase()
+}
 
-  const filtered = useMemo(() => {
-    const q = query.trim()
+/** URL に使う形へ。scripts/build-site.mjs の slugify と同じ処理。 */
+function slugify(name) {
+  const base = String(name || '')
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+  return base || 'unknown'
+}
 
-    if (!q) {
-      return people
-    }
+/** 検索用の索引（TSV）を、必要になったときだけ読み込む。 */
+function useSearchIndex() {
+  const [index, setIndex] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const started = useRef(false)
 
-    return people.filter((person) => person.name.includes(q) || person.read.includes(q))
-  }, [query])
+  const load = useCallback(() => {
+    if (started.current) return
+    started.current = true
+    setLoading(true)
+
+    fetch('/data/search-index.tsv')
+      .then((response) => response.text())
+      .then((text) => {
+        const rows = text.split('\n').filter(Boolean).map((line) => {
+          const [name, reading = '', slug = '', aliases = ''] = line.split('\t')
+          return {
+            name,
+            reading,
+            slug: slug || slugify(name),
+            aliases,
+            key: normalise(name) + normalise(reading) + normalise(aliases),
+          }
+        })
+        setIndex(rows)
+      })
+      .catch(() => setIndex([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return { index, loading, load }
+}
+
+function App() {
+  const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
+  const [featured, setFeatured] = useState(null)
+  const { index, loading, load } = useSearchIndex()
+
+  useEffect(() => {
+    fetch('/data/featured.json')
+      .then((response) => response.json())
+      .then(setFeatured)
+      .catch(() => setFeatured(null))
+  }, [])
+
+  useEffect(() => {
+    const next = query.trim()
+      ? `${location.pathname}?q=${encodeURIComponent(query.trim())}`
+      : location.pathname
+    history.replaceState(null, '', next)
+
+    if (query.trim()) load()
+  }, [query, load])
+
+  const results = useMemo(() => {
+    const keyword = normalise(query)
+    if (!keyword || !index) return []
+    return index.filter((row) => row.key.includes(keyword)).slice(0, MAX_RESULTS)
+  }, [query, index])
+
+  const searching = query.trim().length > 0
 
   return (
-    <main className="wrap">
-      <header>
-        <h1>誰なの？</h1>
-        <p className="lead">名前や読みの一部から探せます。掲載しているのは名前と読みだけです。</p>
+    <main className="site">
+      <header className="masthead">
+        <p className="site-name">この子だれ？</p>
+        <nav>
+          <a href="/actress/">五十音索引</a>
+        </nav>
       </header>
 
-      <div className="search">
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="名前・読みの一部（例: ふかだ）"
-          aria-label="名前で検索"
-        />
-        {query && (
-          <button type="button" onClick={() => setQuery('')}>クリア</button>
-        )}
-      </div>
+      <section className="hero">
+        <h1>名前から、出演者のプロフィールを引く</h1>
+        <p className="lead">
+          FANZA と DUGA が公開している出演者情報を集めた名鑑です。
+          {featured
+            ? `${featured.total.toLocaleString('ja-JP')}人を収録し、うち${featured.detailed.toLocaleString('ja-JP')}人はプロフィールを確認できています。`
+            : ''}
+          名前の一部や読みを入れると、候補を絞り込めます。
+        </p>
 
-      <p className="count">{filtered.length}件</p>
+        <form className="search" role="search" onSubmit={(event) => event.preventDefault()}>
+          <label className="visually-hidden" htmlFor="q">出演者名で検索</label>
+          <input
+            id="q"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onFocus={load}
+            placeholder="名前や読みの一部を入力（例: あいざわ）"
+            autoComplete="off"
+          />
+        </form>
+      </section>
 
-      <ul className="list">
-        {filtered.map((person) => (
-          <li key={person.name}>
-            <span className="name">{person.name}</span>
-            <span className="read">{person.read}</span>
-            <a href={SEARCH_URL(person.name)} rel="nofollow noopener" target="_blank">
-              配信サイトで名前を検索
-            </a>
-          </li>
-        ))}
-      </ul>
+      {searching && (
+        <section className="results" aria-live="polite">
+          <h2>
+            検索結果
+            {index && <span className="count">{results.length >= MAX_RESULTS ? `${MAX_RESULTS}件以上` : `${results.length}件`}</span>}
+          </h2>
 
-      {filtered.length === 0 && (
-        <p className="empty">該当する名前が見つかりませんでした。</p>
+          {loading && <p className="note">読み込み中です…</p>}
+
+          {!loading && index && results.length === 0 && (
+            <p className="note">
+              該当する名前が見つかりませんでした。読み（ひらがな）でも試してみてください。
+            </p>
+          )}
+
+          <ul className="name-list">
+            {results.map((row) => (
+              <li key={row.slug}>
+                <a href={`/actress/${row.slug}/`}>
+                  {row.name}
+                  {row.reading && <span className="reading">{row.reading}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!searching && featured?.people?.length > 0 && (
+        <section className="results">
+          <h2>プロフィールを確認できている方</h2>
+          <ul className="card-list">
+            {featured.people.map((person) => (
+              <li key={person.slug}>
+                <a href={`/actress/${person.slug}/`}>
+                  <span className="card-name">{person.name}</span>
+                  {person.reading && <span className="card-reading">{person.reading}</span>}
+                  {person.facts.length > 0 && <span className="card-facts">{person.facts.join('・')}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="more">
+            <a href="/actress/">五十音索引ですべて見る</a>
+          </p>
+        </section>
       )}
 
       <section className="about">
-        <h2>掲載しているもの</h2>
+        <h2>このサイトについて</h2>
         <p>
-          名前と読みだけです。身長・スリーサイズ・所属事務所・デビュー年・外見の特徴は、
-          裏付けを確認できないため掲載していません。
+          掲載しているのは、FANZA と DUGA が API で公開している項目だけです。
+          出典が確認できないことは書きません。身体的特徴や経歴を推測で補うこともしません。
         </p>
         <p>
-          作品情報へのリンクは、名前で検索する形にしています。ID を直接指定すると、
-          取り違えたときに別人のページへ誘導してしまうためです。
-          検索結果が目的の方と一致するかは、ご自身でご確認ください。
+          そのため、名前と読みしか分からない方のページには、プロフィール欄がありません。
+          情報が無いことを、そのまま「無い」と表示しています。
         </p>
+        <ul className="sources">
+          <li>
+            <a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA ActressSearch API</a>
+          </li>
+          <li>
+            <a href="https://affiliate.duga.jp/" target="_blank" rel="noopener">DUGA アフィリエイト Web サービス</a>
+          </li>
+        </ul>
+        {featured?.confirmedOn && (
+          <p className="note">{featured.confirmedOn} 時点のデータです。</p>
+        )}
+      </section>
 
-        <h2>掲載の削除について</h2>
+      <section className="about">
+        <h2>訂正・削除のご依頼</h2>
         <p>
-          ご本人・関係者の方で掲載を希望されない場合は、下記へご連絡ください。確認のうえ削除します。
-          誤りのご指摘も同じ窓口で受け付けます。
+          ご本人および関係者の方から掲載を希望しない旨のご連絡をいただいた場合、確認のうえ削除します。
+          記載内容の誤りについても同じ窓口で承ります。
         </p>
         <p>
           <a href="mailto:info@darekore.jp">info@darekore.jp</a>
         </p>
-
-        <h2>年齢確認</h2>
-        <p>
-          このサイトは成人向けコンテンツを扱う配信サイトへのリンクを含みます。18歳未満の方はご利用いただけません。
-        </p>
       </section>
+
+      <footer className="site-footer">
+        <p className="adult">このサイトは18歳未満の方に向けたものではありません。</p>
+        <nav aria-label="フッターナビ">
+          <a href="/actress/">五十音索引</a>
+          <a href="/privacy/">プライバシーポリシー</a>
+          <a href="mailto:info@darekore.jp">お問い合わせ</a>
+        </nav>
+        <p className="copy">© {new Date().getFullYear()} この子だれ？</p>
+      </footer>
     </main>
   )
 }
+
+export default App

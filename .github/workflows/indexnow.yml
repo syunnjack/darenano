@@ -1,0 +1,95 @@
+name: IndexNow
+
+# 追加されたページだけを IndexNow に送る。
+#
+# 以前は push のたびにサイトマップの先頭10,000件を送り直していた。
+# 中身が変わっていないURLを繰り返し送っても意味がなく、送りすぎとして
+# 扱われかねないため、公開済みURLの記録（published-slugs.txt）に
+# 増えた行だけを送るようにした。
+#
+# 手動実行のときは、サイトマップ全体（最大10,000件）を送る。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/data/published-slugs.txt'
+  workflow_dispatch:
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: 送るURLを決める
+        id: collect
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "手動実行なので、サイトマップ全体を送ります。"
+            curl -fsS "https://darekore.jp/sitemap.xml" \
+              | grep -oP '(?<=<loc>)[^<]+' \
+              | head -10000 > urls.txt
+          else
+            # 直前のコミットとの差分で、増えたスラッグだけを拾う。
+            git diff HEAD~1 HEAD -- public/data/published-slugs.txt \
+              | grep '^+[^+]' | sed 's/^+//' \
+              | while read -r slug; do
+                  [ -n "$slug" ] && printf 'https://darekore.jp/actress/%s/\n' \
+                    "$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$slug")"
+                done | head -10000 > urls.txt
+          fi
+
+          count=$(wc -l < urls.txt)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "送るURL: ${count}件"
+
+      - name: 公開されるまで待つ
+        if: steps.collect.outputs.count != '0'
+        run: |
+          set +e
+          for i in $(seq 1 30); do
+            if curl -fsS https://darekore.jp/sitemap.xml | grep -q '<lastmod>'; then
+              echo "公開を確認しました。"
+              exit 0
+            fi
+            echo "公開待ち... ($i/30)"
+            sleep 20
+          done
+          echo "待ち時間を過ぎました。そのまま送信します。"
+
+      - name: IndexNow に送る
+        if: steps.collect.outputs.count != '0'
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: |
+          set -euo pipefail
+          KEY="${INDEXNOW_KEY:-darekoreindex2026}"
+
+          python3 - "$KEY" urls.txt payload.json <<'PY'
+          import json
+          import sys
+
+          key, urls_path, payload_path = sys.argv[1:]
+
+          with open(urls_path, encoding='utf-8') as source:
+              urls = [line.strip() for line in source if line.strip()]
+
+          payload = {
+              'host': 'darekore.jp',
+              'key': key,
+              'keyLocation': f'https://darekore.jp/{key}.txt',
+              'urlList': urls,
+          }
+
+          with open(payload_path, 'w', encoding='utf-8') as destination:
+              json.dump(payload, destination, ensure_ascii=False)
+          PY
+
+          curl -fsS -X POST "https://api.indexnow.org/indexnow" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            --data-binary "@payload.json"
