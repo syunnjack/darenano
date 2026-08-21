@@ -1,32 +1,57 @@
-# 誰なの？（darekore.jp）
+# darenano（darekore.jp）
 
-名前と読みの一部から探せる、名前検索の小さなサイト。
+**このリポジトリが `darekore.jp` の配信元です。**
 
-## 掲載しているもの
+出演者の名前と読みから、プロフィールを引くための名鑑。
 
-**名前と読みだけ**。
+- 本番URL: https://darekore.jp
+- 配信: GitHub Pages（`public/CNAME` に `darekore.jp`）
+- **GitHub の Settings → Pages でも Custom domain の設定が要る。**
+  CNAME ファイルだけでは足りない
+- 同じドメインを別リポジトリに設定すると、こちらの紐付けが外れてサイトが消える
 
-以前は身長・スリーサイズ・所属事務所・デビュー年・外見のタグを持っていたが、
-出典が記録されておらず、実在の人物について裏付けのない身体的特徴を公開している
-状態だった。確認できないものは載せない方針に変えて削除した。
+以前は中身が `task-dashboard` にあったが、あちらは private で
+GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 
-一般の俳優と同名で取り違えの疑いがある行（安達祐実）も削除した。
+## 掲載しているデータ
 
-作品情報へのリンクは、固定IDではなく**名前での検索**にしている。
-IDが取り違っていると別人のページへ誘導してしまうため。
+権利者が API で公開している項目だけを持つ。推測・補完・独自の評価は載せない。
+
+| 出典 | 取得スクリプト | 中身 |
+|---|---|---|
+| FANZA ActressSearch API | `scripts/fetch-actresses.py` | 氏名・読み・別名義・生年月日・出身地・身長・血液型・趣味・写真 |
+| DUGA アフィリエイト Web サービス | `scripts/fetch-duga-performers.py` | 氏名・カナ・収録作品数 |
+
+出力先は `public/data/`。ページの生成は `scripts/build-site.mjs`。
+
+以前は出典の記録が無いまま身体的特徴を載せていた。確認できないものは載せない
+方針に変えて、すべて API 由来のデータに置き換えてある。
+
+### 認証情報
+
+**リポジトリには置かない。** GitHub Secrets と環境変数で渡す。
+
+| 環境変数 | 用途 |
+|---|---|
+| `FANZA_API_ID` | FANZA API ID |
+| `FANZA_AFFILIATE_ID` | FANZA アフィリエイトID（`xxxx-99x` 形式） |
+| `DUGA_APP_ID` | DUGA の appid |
+| `DUGA_AGENT_ID` | DUGA の代理店ID |
+
+DUGA の API 制限は 60秒あたり60リクエスト。全商品を見るのに約90分かかるので、
+1,000件ごとに書き出して、途中で止まっても続きから再開できるようにしてある。
 
 ## 削除依頼
 
 ご本人・関係者から掲載を希望しない旨の連絡を受けたら削除する。
-窓口は `info@darekore.jp`（画面にも表示している）。
+窓口は `info@darekore.jp`。画面にも表示している。
 
-## 配信
+## Commands
 
-GitHub Pages（`syunnjack/darenano`）。独自ドメインは `darekore.jp`。
-
-- `public/CNAME` に `darekore.jp` を置いている。**これが無いと独自ドメインの
-  紐付けが外れ、サイト全体が「Site not found」になる**（実際に起きた）
-- `vite.config.js` の `base` は `/`。`/darenano/` にすると独自ドメイン側で
-  CSS/JS を読み込めなくなる
+- `npm run dev`: 開発サーバー起動
+- `npm run build`: 本番ビルド（`prebuild` でページを生成する）
+- `npm run lint`: 静的解析
+- `npm run preview`: ビルド結果のプレビュー
 
 `main` へ push すると Actions が `dist/` を Pages へ配信する。
+データの取り直しは `refresh-data.yml`（週1回）。

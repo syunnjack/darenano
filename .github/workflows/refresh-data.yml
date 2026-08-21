@@ -1,0 +1,82 @@
+name: Refresh data
+
+# FANZA と DUGA から出演者データを取り直して、変化があれば commit する。
+# ページの生成は deploy 側の prebuild で行うので、ここではデータだけを更新する。
+#
+# DUGA は 60秒あたり60リクエストの制限があり、全商品を見るのに数時間かかる。
+# 毎月1回の実行にしている。
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'   # 毎週月曜 03:00 JST
+  workflow_dispatch:
+    inputs:
+      duga:
+        description: 'DUGA も取り直す'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: FANZA の出演者を取り直す
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+        run: python scripts/fetch-actresses.py public/data/actresses.json
+
+      # DUGA は全商品を見るのに数時間かかる。時間で切り上げて、
+      # 途中経過（nextOffset つき）を commit しておく。次回の実行が続きから取る。
+      - name: DUGA の出演者を取り直す
+        if: ${{ github.event_name == 'schedule' || inputs.duga }}
+        env:
+          DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
+          DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
+          DUGA_MAX_MINUTES: '240'
+        run: python scripts/fetch-duga-performers.py public/data/duga-performers.json
+
+      # 公開済みURLの記録（published-slugs.txt）を更新するために、ここでも生成しておく。
+      # 生成したページ自体は .gitignore で除いてあるので commit されない。
+      - name: ページを生成して、公開済みURLの記録を更新する
+        run: node scripts/build-site.mjs
+
+      - name: 変化があれば commit する
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/data/actresses.json public/data/duga-performers.json public/data/published-slugs.txt
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+          git commit -m "出演者データを取り直す（FANZA / DUGA）"
+          git pull --rebase origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  # bot の push では deploy が起動しないため、ここから明示的に呼ぶ。
+  deploy:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
