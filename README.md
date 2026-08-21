@@ -21,7 +21,7 @@ GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 |---|---|---|
 | FANZA ActressSearch API | `scripts/fetch-actresses.py` | 氏名・読み・別名義・生年月日・出身地・身長・血液型・趣味・写真 |
 | DUGA アフィリエイト Web サービス | `scripts/fetch-duga-performers.py` | 氏名・カナ・出演者ID |
-| DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先） |
+| DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先）・収録期間 |
 
 出力先は `public/data/`。ページの生成は `scripts/build-site.mjs`。
 
@@ -49,7 +49,12 @@ DUGA の API 制限は 60秒あたり60リクエスト。全商品を見るの�
 
 作品データCSV（`https://duga.jp/productcsv/`、認証不要・毎日12:30と18:30に更新）は
 ウェブサービスより収録が広い（CSV 238,872作品・45,194人 / API 195,824作品・8,865人）。
-作品数とリンク先はCSVから取る。出演者IDと読み仮名はCSVに無いので、ウェブサービス側から取る。
+作品数・リンク先・収録期間はCSVから取る。出演者IDと読み仮名はCSVに無いので、
+ウェブサービス側から取る。
+
+「DUGAでの収録」は、その人の作品のうち公開日がいちばん古いものと新しいものの範囲。
+**本人の活動期間そのものではない**ので、そう書かないこと。DUGAに無い時期の作品や、
+他社でのみ配信された作品は含まれない。
 
 ## 削除依頼
 

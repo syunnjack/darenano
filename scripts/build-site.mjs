@@ -117,7 +117,28 @@ function profileOf(person) {
   const size = ['bust', 'waist', 'hip'].map((key) => source[key]).filter(Boolean)
   if (size.length === 3) entries.push(['スリーサイズ', `B${size[0]} / W${size[1]} / H${size[2]}`])
 
+  // DUGA に収録されている作品の、公開日のいちばん古いものと新しいもの。
+  // 本人の活動期間そのものではなく、あくまで収録の範囲。
+  const span = duraSpan(person.duga)
+  if (span) entries.push(['DUGAでの収録', span])
+
   return entries
+}
+
+/** 「2019年3月 〜 2026年3月（14作品）」の形にする。 */
+function duraSpan(duga) {
+  if (!duga?.firstOpenedOn || !duga?.lastOpenedOn) return ''
+
+  const label = (iso) => {
+    const [year, month] = iso.split('-')
+    return `${Number(year)}年${Number(month)}月`
+  }
+
+  const first = label(duga.firstOpenedOn)
+  const last = label(duga.lastOpenedOn)
+  const works = `${duga.works.toLocaleString('ja-JP')}作品`
+
+  return first === last ? `${first}（${works}）` : `${first} 〜 ${last}（${works}）`
 }
 
 function sourcesOf(person, confirmedOn) {
@@ -191,8 +212,12 @@ function renderPage(person, { profile, sources, related, indexable }) {
   // 作品データCSVにも、あるのは商品ページのURLだけ）。氏名での検索URLを組んでみたが
   // 該当なしになったため、いちばん新しい出演作品のページへ案内する。
   if (person.duga?.productId) {
+    const opened = person.duga.productOpenedOn
+      ? `（${person.duga.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日公開`)}）`
+      : ''
+
     works.push([
-      'DUGA で最新の出演作品を見る',
+      `DUGA で最新の出演作品を見る${opened}`,
       `https://click.duga.jp/ppv/${encodeURIComponent(person.duga.productId)}/${DUGA_AGENT_ID}-01`,
     ])
   }
@@ -474,6 +499,9 @@ async function main() {
     if (!found) continue
     record.productId = found.productId
     record.works = found.works       // CSV のほうが収録範囲が広い
+    record.firstOpenedOn = found.firstOpenedOn
+    record.lastOpenedOn = found.lastOpenedOn
+    record.productOpenedOn = found.productOpenedOn
   }
 
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)

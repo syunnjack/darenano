@@ -89,6 +89,8 @@ def main() -> None:
                 'works': 0,
                 'productId': '',
                 'productOpenedOn': '',
+                'firstOpenedOn': '',
+                'lastOpenedOn': '',
             })
             record['works'] += 1
 
@@ -96,6 +98,13 @@ def main() -> None:
             if product_id and opened >= record['productOpenedOn']:
                 record['productId'] = product_id
                 record['productOpenedOn'] = opened
+
+            # 収録作品の公開日の範囲。日付が入っている作品だけで数える。
+            if opened:
+                if not record['firstOpenedOn'] or opened < record['firstOpenedOn']:
+                    record['firstOpenedOn'] = opened
+                if opened > record['lastOpenedOn']:
+                    record['lastOpenedOn'] = opened
 
     records = sorted(performers.values(), key=lambda r: (-r['works'], r['name']))
 
@@ -109,8 +118,11 @@ def main() -> None:
     }, ensure_ascii=False), encoding='utf-8')
 
     print(f'{products:,}作品から、出演者 {len(records):,}人を集めました → {output}')
+    dated = sum(1 for r in records if r['firstOpenedOn'])
+    print(f'  公開日が分かる出演者: {dated:,}人')
     for record in records[:5]:
-        print(f"  {record['name']} {record['works']}作品（代表作 {record['productId']}）")
+        span = f"{record['firstOpenedOn']}〜{record['lastOpenedOn']}" if record['firstOpenedOn'] else '不明'
+        print(f"  {record['name']} {record['works']}作品（{span}）")
 
 
 main()
