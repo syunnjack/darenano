@@ -42,13 +42,18 @@ jobs:
 
       # DUGA は全商品を見るのに数時間かかる。時間で切り上げて、
       # 途中経過（nextOffset つき）を commit しておく。次回の実行が続きから取る。
-      - name: DUGA の出演者を取り直す
+      - name: DUGA の出演者を取り直す（ウェブサービス。出演者IDと読み仮名のため）
         if: ${{ github.event_name == 'schedule' || inputs.duga }}
         env:
           DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
           DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
           DUGA_MAX_MINUTES: '240'
         run: python scripts/fetch-duga-performers.py public/data/duga-performers.json
+
+      # 作品データCSVは1回のダウンロードで済み、収録も広い。
+      # 作品数と、リンク先にする代表作品はこちらから取る。認証は要らない。
+      - name: DUGA の作品データCSVを取り込む
+        run: python scripts/fetch-duga-csv.py public/data/duga-products.json
 
       # 公開済みURLの記録（published-slugs.txt）を更新するために、ここでも生成しておく。
       # 生成したページ自体は .gitignore で除いてあるので commit されない。
@@ -60,7 +65,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/data/actresses.json public/data/duga-performers.json public/data/published-slugs.txt
+          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/published-slugs.txt
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "データに変化はありませんでした。"

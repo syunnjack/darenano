@@ -11,7 +11,7 @@
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { merge, normaliseReading } from './lib/merge.mjs'
+import { merge, normaliseName, normaliseReading } from './lib/merge.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const publicDir = path.join(root, 'public')
@@ -22,6 +22,10 @@ const SITE_NAME = 'この子だれ？'
 const GA_ID = 'G-5P2QCWYG8V'
 const SITE_VERIFICATION = 'UkVs5hg-pf8rhHl-6SjNmf5AVU5fHm-ha3eBCk5Y5wA'
 const CONTACT = 'info@darekore.jp'
+
+// DUGA の代理店ID。リンクに現れる公開の値で、秘密のキーではない。
+// （FANZA のアフィリエイトIDも、API が返す一覧URLに含まれている。）
+const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 
 // 五十音の見出しと、そこに入れる読みの頭文字。濁音・半濁音は清音にまとめる。
 const KANA_ROWS = [
@@ -175,8 +179,28 @@ function renderPage(person, { profile, sources, related, indexable }) {
         .join('')}</tbody></table>`
     : '<p class="thin">この方は、名前と読み以外の情報が出典元で公開されていません。確認できないことは書かない方針のため、掲載していません。</p>'
 
-  const worksHtml = person.fanza?.listUrl
-    ? `<p class="works"><a class="button" href="${escapeHtml(person.fanza.listUrl)}" target="_blank" rel="nofollow sponsored noopener">FANZA で出演作品を見る</a><span class="pr">広告</span></p>`
+  // 出演作品へのリンク。FANZA は API が一覧のURLを返すのでそれを使う。
+  // DUGA は返さないため、氏名での検索へアフィリエイトの転送を通して繋ぐ。
+  const works = []
+
+  if (person.fanza?.listUrl) {
+    works.push(['FANZA で出演作品を見る', person.fanza.listUrl])
+  }
+
+  // DUGA には出演者ごとのページのURLが公式に無い（ウェブサービスのレスポンスにも
+  // 作品データCSVにも、あるのは商品ページのURLだけ）。氏名での検索URLを組んでみたが
+  // 該当なしになったため、いちばん新しい出演作品のページへ案内する。
+  if (person.duga?.productId) {
+    works.push([
+      'DUGA で最新の出演作品を見る',
+      `https://click.duga.jp/ppv/${encodeURIComponent(person.duga.productId)}/${DUGA_AGENT_ID}-01`,
+    ])
+  }
+
+  const worksHtml = works.length
+    ? `<p class="works">${works
+        .map(([label, url]) => `<a class="button" href="${escapeHtml(url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(label)}</a>`)
+        .join('')}<span class="pr">広告</span></p>`
     : ''
 
   // 写真は権利者（FANZA）が配信しているものをそのまま参照する。保存も加工もしない。
@@ -378,6 +402,7 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .photo img { display:block; width:160px; height:auto; border-radius:10px; border:1px solid #ecdfe2; background:#fff; }
 .photo figcaption { font-size:11px; color:#8a838f; margin-top:4px; text-align:center; }
 .works { margin:22px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.works .button + .button { background:#7a4bb5; }
 .button { display:inline-block; background:#e0574a; color:#fff; text-decoration:none; padding:11px 20px; border-radius:8px; font-weight:700; font-size:15px; }
 .pr { font-size:11px; color:#8a838f; border:1px solid #ddd6dc; border-radius:4px; padding:1px 6px; }
 .source-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
@@ -433,6 +458,22 @@ async function main() {
     dugaConfirmed = dugaFile.confirmedOn ?? ''
   } catch {
     console.log('DUGA のデータが無いので、FANZA だけで作ります。')
+  }
+
+  // 作品データCSVから、作品数と代表作品を補う。氏名で突き合わせる。
+  let dugaProducts = new Map()
+  try {
+    const file = await readJson(path.join(publicDir, 'data/duga-products.json'))
+    dugaProducts = new Map((file.performers ?? []).map((p) => [normaliseName(p.name), p]))
+  } catch {
+    console.log('DUGA の作品データCSVが無いので、作品ページへのリンクは付けません。')
+  }
+
+  for (const record of dugaRecords) {
+    const found = dugaProducts.get(normaliseName(record.name))
+    if (!found) continue
+    record.productId = found.productId
+    record.works = found.works       // CSV のほうが収録範囲が広い
   }
 
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)
