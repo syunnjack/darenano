@@ -35,6 +35,20 @@ UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
 # 出演者名として扱わないもの（CSVに紛れ込む表記）
 SKIP_NAMES = {'不明', '素人', '一般女性', '（不明）', '-', '―'}
 
+# レーベル名に露骨な語が入っているものは表示しない。
+# 1,068種のうち30種ほどが該当する（「女排泄一門会」「フェラチオハンター」など）。
+# 「熟女」「人妻」のようなジャンル語は、露骨な描写ではないので除かない。
+EXPLICIT = (
+    '排泄', '浣腸', '放尿', '小便', 'ウンコ', '糞', 'ゲロ', '嘔吐', 'スカトロ',
+    'フェラ', '手コキ', '素股', 'ハメ', '中出し', 'アナル', '潮吹', '射精', '精子',
+    '乱交', '輪姦', 'レイプ', '強姦', '近親', '痴漢', '露出', '奴隷', '調教',
+    '無修正', 'ロリ', '児童', 'JK', '女子校', 'アヘ', 'アへ', '羞恥',
+)
+
+
+def displayable(label: str) -> bool:
+    return bool(label) and not any(word in label for word in EXPLICIT)
+
 
 def download() -> bytes:
     cache = Path(__file__).resolve().parent / '.cache' / 'duga-products.csv'
@@ -91,6 +105,7 @@ def main() -> None:
                 'productOpenedOn': '',
                 'firstOpenedOn': '',
                 'lastOpenedOn': '',
+                'labelCounts': {},
             })
             record['works'] += 1
 
@@ -99,12 +114,22 @@ def main() -> None:
                 record['productId'] = product_id
                 record['productOpenedOn'] = opened
 
+            label = (row.get('レーベル名') or '').strip()
+            if displayable(label):
+                record['labelCounts'][label] = record['labelCounts'].get(label, 0) + 1
+
             # 収録作品の公開日の範囲。日付が入っている作品だけで数える。
             if opened:
                 if not record['firstOpenedOn'] or opened < record['firstOpenedOn']:
                     record['firstOpenedOn'] = opened
                 if opened > record['lastOpenedOn']:
                     record['lastOpenedOn'] = opened
+
+    # 作品数の多い順に、上位3つのレーベルだけ残す。
+    for record in performers.values():
+        counts = record.pop('labelCounts')
+        ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        record['labels'] = [name for name, _count in ordered[:3]]
 
     records = sorted(performers.values(), key=lambda r: (-r['works'], r['name']))
 
@@ -119,7 +144,9 @@ def main() -> None:
 
     print(f'{products:,}作品から、出演者 {len(records):,}人を集めました → {output}')
     dated = sum(1 for r in records if r['firstOpenedOn'])
+    labelled = sum(1 for r in records if r['labels'])
     print(f'  公開日が分かる出演者: {dated:,}人')
+    print(f'  表示できるレーベルがある出演者: {labelled:,}人')
     for record in records[:5]:
         span = f"{record['firstOpenedOn']}〜{record['lastOpenedOn']}" if record['firstOpenedOn'] else '不明'
         print(f"  {record['name']} {record['works']}作品（{span}）")

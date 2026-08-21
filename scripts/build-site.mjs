@@ -122,6 +122,11 @@ function profileOf(person) {
   const span = duraSpan(person.duga)
   if (span) entries.push(['DUGAでの収録', span])
 
+  // 出演の多いレーベル。露骨な名称のものは取得側で除いてある。
+  if (person.duga?.labels?.length) {
+    entries.push(['主なレーベル', person.duga.labels.join('、')])
+  }
+
   return entries
 }
 
@@ -502,6 +507,7 @@ async function main() {
     record.firstOpenedOn = found.firstOpenedOn
     record.lastOpenedOn = found.lastOpenedOn
     record.productOpenedOn = found.productOpenedOn
+    record.labels = found.labels
   }
 
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)
