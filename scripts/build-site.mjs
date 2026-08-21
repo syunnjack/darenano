@@ -295,7 +295,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
     <script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>
     <link rel="stylesheet" href="/actress/page.css" />
-    <script defer src="/actress/ugc.js"></script>
+    <script defer src="/assets/ugc.js"></script>
   </head>
   <body>
     <div class="wrap">
@@ -427,7 +427,7 @@ function renderRankingPage() {
                data-key="${escapeHtml(SUPABASE_ANON_KEY)}">
         <p class="note">読み込んでいます…</p>
       </section>
-      <script defer src="/ranking/ranking.js"></script>`,
+      <script defer src="/assets/ranking.js"></script>`,
   })
 }
 
