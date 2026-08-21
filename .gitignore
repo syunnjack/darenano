@@ -12,3 +12,5 @@ public/data/search-index.tsv
 public/data/featured.json
 public/data/*.tmp
 public/sitemap.xml
+
+scripts/.cache/
