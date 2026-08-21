@@ -78,6 +78,34 @@ DUGA ウェブサービスの規約で、**指定のクレジットの表示が�
 
 規定を守らないと API の利用を止められることがある。
 
+## 投票と口コミ
+
+静的サイトなので投稿の保存先が無い。**Supabase**（東京リージョン）に置いている。
+
+- 定義: `supabase/migrations/0001_votes_and_reviews.sql`
+- 画面: `public/actress/ugc.js`（出演者ページ）、`public/ranking/ranking.js`
+- ビルド時に `SUPABASE_URL` と `SUPABASE_ANON_KEY` を埋め込む（GitHub Secrets）
+
+**匿名キーは公開してよい値**で、守りは RLS だけが担う。次の3つは必ず保つこと。
+
+1. 口コミは `status = 'approved'` のものしか読めない
+2. 投稿は必ず `pending` から始まる（投稿者が承認済みで入れられない）
+3. anon に update と delete のポリシーを作らない（後から書き換え・削除できない）
+
+**実在の人物についての書き込みなので、公開前に運営が確認する。**
+承認は Supabase の SQL Editor から。
+
+```sql
+-- 未承認の一覧
+select id, slug, nickname, body, created_at
+  from performer_reviews where status = 'pending' order by created_at;
+
+select approve_review(123);   -- 公開する
+select reject_review(123);    -- 公開しない
+```
+
+ランキングは**当サイトの投票数**で並べたもの。外部の人気度ではないと画面に明記している。
+
 ## 削除依頼
 
 ご本人・関係者から掲載を希望しない旨の連絡を受けたら削除する。
