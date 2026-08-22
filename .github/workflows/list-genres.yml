@@ -1,0 +1,31 @@
+name: List FANZA genres
+
+# FANZA動画に、どういう名前のジャンルがあるかを一覧する。
+# fetch-genres.py の GENRES に書く名前は、ここに出てくる表記と
+# 一字一句そろえる必要がある（似た名前を書くと黙って飛ばされる）。
+#
+# 数十秒で終わる。データは何も書き換えない。
+
+on:
+  workflow_dispatch:
+    inputs:
+      keyword:
+        description: '絞り込む語（空なら全部）'
+        type: string
+        required: false
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: ジャンル名を一覧する
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          KEYWORD: ${{ inputs.keyword }}
+        run: python scripts/list-genres.py
