@@ -32,6 +32,10 @@ const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 // されているため、rel などを足さずそのままの形で出す。
 const DUGA_CREDIT = `<a href="https://click.duga.jp/aff/api/${DUGA_AGENT_ID}-01" target="_blank">Powered by DUGAウェブサービス</a>`
 
+// ソクミルも、指定のHTMLをそのまま出すことが義務づけられている。
+const SOKMIL_CREDIT = '<a href="https://sokmil-ad.com/" target="_blank" rel="nofollow">'
+  + '<img src="https://sokmil-ad.com/api/credit/135x18.gif" alt="WEB SERVICE BY SOKMIL" width="135" height="18" border="0"></a>'
+
 // 投票と口コミの保存先。匿名キーは公開してよい値で、守りはデータベース側の RLS。
 // 未設定のときは、投稿欄を出さずにページを作る。
 const SUPABASE_URL = process.env.SUPABASE_URL || ''
@@ -127,6 +131,21 @@ function profileOf(person) {
   const size = ['bust', 'waist', 'hip'].map((key) => source[key]).filter(Boolean)
   if (size.length === 3) entries.push(['スリーサイズ', `B${size[0]} / W${size[1]} / H${size[2]}`])
 
+  // ソクミルからしか取れない項目。FANZA に無いときは、そちらの値も使う。
+  const sokmil = person.sokmil ?? {}
+  if (sokmil.cup) entries.push(['カップ', `${sokmil.cup}カップ`])
+
+  if (!entries.some(([label]) => label === 'スリーサイズ')) {
+    const other = ['bust', 'waist', 'hip'].map((key) => sokmil[key]).filter(Boolean)
+    if (other.length === 3) entries.push(['スリーサイズ', `B${other[0]} / W${other[1]} / H${other[2]}`])
+  }
+  if (!entries.some(([label]) => label === '出身地') && sokmil.prefectures) {
+    entries.push(['出身地', String(sokmil.prefectures)])
+  }
+  if (!entries.some(([label]) => label === '血液型') && sokmil.blood_type) {
+    entries.push(['血液型', String(sokmil.blood_type)])
+  }
+
   // DUGA に収録されている作品の、公開日のいちばん古いものと新しいもの。
   // 本人の活動期間そのものではなく、あくまで収録の範囲。
   const span = duraSpan(person.duga)
@@ -173,6 +192,14 @@ function sourcesOf(person, confirmedOn) {
       label: 'DUGA アフィリエイト Web サービス',
       url: 'https://affiliate.duga.jp/',
       note: `出演者ID ${person.duga.dugaId} / 収録作品 ${person.duga.works.toLocaleString('ja-JP')}件`,
+    })
+  }
+
+  if (person.sokmil) {
+    list.push({
+      label: 'ソクミルアフィリエイト WEBサービス',
+      url: 'https://sokmil-ad.com/',
+      note: `出演者ID ${person.sokmil.sokmilId}`,
     })
   }
 
@@ -227,6 +254,10 @@ function renderPage(person, { profile, sources, related, indexable }) {
   // DUGA には出演者ごとのページのURLが公式に無い（ウェブサービスのレスポンスにも
   // 作品データCSVにも、あるのは商品ページのURLだけ）。氏名での検索URLを組んでみたが
   // 該当なしになったため、いちばん新しい出演作品のページへ案内する。
+  if (person.sokmil?.affiliateURL) {
+    works.push(['ソクミル で出演作品を見る', person.sokmil.affiliateURL])
+  }
+
   if (person.duga?.productId) {
     const opened = person.duga.productOpenedOn
       ? `（${person.duga.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日公開`)}）`
@@ -246,7 +277,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
 
   // 写真は権利者（FANZA）が配信しているものをそのまま参照する。保存も加工もしない。
   // API は http:// で返してくるが、https のページから読むので付け替える。
-  const photo = person.fanza?.image ? person.fanza.image.replace(/^http:\/\//, 'https://') : ''
+  const photo = (person.fanza?.image || person.sokmil?.imageURL || '').replace(/^http:\/\//, 'https://')
   const photoHtml = photo
     ? `<figure class="photo"><img src="${escapeHtml(photo)}" alt="${escapeHtml(person.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="160" height="200" /><figcaption>写真: FANZA</figcaption></figure>`
     : ''
@@ -319,7 +350,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
         <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
-        <p class="credit">${DUGA_CREDIT}</p>
+        <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -455,7 +486,7 @@ function shell({ title, description, canonical, crumbs, body }) {
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
         <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
-        <p class="credit">${DUGA_CREDIT}</p>
+        <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
   </body>
@@ -582,7 +613,45 @@ async function main() {
     record.labels = found.labels
   }
 
+  // ソクミル。3社目の出典。カップ数は FANZA にも DUGA にも無い項目。
+  let sokmilRecords = []
+  try {
+    const file = await readJson(path.join(publicDir, 'data/sokmil.json'))
+    sokmilRecords = file.performers ?? []
+  } catch {
+    console.log('ソクミルのデータが無いので、そのぶんは載せません。')
+  }
+
   const { people, matched, added } = merge(fanzaRecords, dugaRecords)
+
+  // 氏名で突き合わせ、無ければ新しい人として足す。
+  const byName = new Map(people.map((p) => [normaliseName(p.name), p]))
+  let sokmilMatched = 0
+  let sokmilAdded = 0
+
+  for (const record of sokmilRecords) {
+    const key = normaliseName(record.name)
+    const found = byName.get(key)
+
+    if (found) {
+      if (!found.sokmil) {
+        found.sokmil = record
+        sokmilMatched += 1
+      }
+      continue
+    }
+
+    const person = {
+      name: record.name,
+      reading: record.reading || '',
+      fanza: null,
+      duga: null,
+      sokmil: record,
+    }
+    people.push(person)
+    byName.set(key, person)
+    sokmilAdded += 1
+  }
 
   // 名義ごとの収録期間。改名して名前が変わっている人は、
   // それぞれの名前で作品が残っているので、いつ頃どの名前だったかが分かる。
@@ -628,7 +697,7 @@ async function main() {
     usedSlugs.add(slug)
     person.slug = slug
     person.profile = profileOf(person)
-    person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || Boolean(person.fanza?.image)
+    person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
   }
 
   const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
@@ -782,7 +851,8 @@ async function main() {
     'utf8'
   )
 
-  console.log(`FANZA ${fanzaRecords.length.toLocaleString('ja-JP')}人 / DUGA ${dugaRecords.length.toLocaleString('ja-JP')}人`)
+  console.log(`FANZA ${fanzaRecords.length.toLocaleString('ja-JP')}人 / DUGA ${dugaRecords.length.toLocaleString('ja-JP')}人 / ソクミル ${sokmilRecords.length.toLocaleString('ja-JP')}人`)
+  console.log(`  ソクミル: 同一人物 ${sokmilMatched.toLocaleString('ja-JP')}人 / ソクミルだけの人 ${sokmilAdded.toLocaleString('ja-JP')}人`)
   console.log(`  突き合わせ: 同一人物 ${matched.toLocaleString('ja-JP')}人 / DUGA だけの人 ${added.toLocaleString('ja-JP')}人`)
   console.log(`  のべ ${people.length.toLocaleString('ja-JP')}人`)
   console.log(`ページ: ${targets.length.toLocaleString('ja-JP')}件（うち索引に載せる ${indexable.length.toLocaleString('ja-JP')}件）`)

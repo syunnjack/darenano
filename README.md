@@ -22,6 +22,7 @@ GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 | FANZA ActressSearch API | `scripts/fetch-actresses.py` | 氏名・読み・別名義・生年月日・出身地・身長・血液型・趣味・写真 |
 | DUGA アフィリエイト Web サービス | `scripts/fetch-duga-performers.py` | 氏名・カナ・出演者ID |
 | DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先）・収録期間・主なレーベル |
+| ソクミル WEBサービス | `scripts/fetch-sokmil.py` | 氏名・読み・**カップ数**・スリーサイズ・出身地・血液型・写真 |
 
 出力先は `public/data/`。ページの生成は `scripts/build-site.mjs`。
 
@@ -38,6 +39,8 @@ GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 | `FANZA_AFFILIATE_ID` | FANZA アフィリエイトID（`xxxx-99x` 形式） |
 | `DUGA_APP_ID` | DUGA の appid |
 | `DUGA_AGENT_ID` | DUGA の代理店ID |
+| `SOKMIL_API_KEY` | ソクミルのAPIキー |
+| `SOKMIL_AFFILIATE_ID` | ソクミルのアフィリエイトID（`25173-001` 形式） |
 
 DUGA の API 制限は 60秒あたり60リクエスト。全商品を見るのに約90分かかるので、
 1,000件ごとに書き出して、途中で止まっても続きから再開できるようにしてある。
@@ -105,6 +108,31 @@ select reject_review(123);    -- 公開しない
 ```
 
 ランキングは**当サイトの投票数**で並べたもの。外部の人気度ではないと画面に明記している。
+
+## ソクミル（3社目の出典）
+
+**エンドポイント名に注意。** 説明書は「出演者検索API」だが、パスは
+`Actress` ではなく **`Actor`**（`Actress` は404）。
+
+```
+https://sokmil-ad.com/api/v1/Actor?api_key=...&affiliate_id=...
+```
+
+**連続で叩くと 403 を返す。** 0.4秒間隔で100件ずつ取ると数十回で遮断された。
+1.5秒空け、403 のときは60秒待ってから続きを試す作りにしてある。
+1,000件ごとに書き出し、途中で止まっても続きから再開できる。
+
+36,553人のうち、FANZAにもいるのが29,672人、ソクミルだけが5,962人。
+**カップ数は FANZA にも DUGA にも無い項目**で、6,000人ぶん足せた。
+身長と生年月日はソクミルが持っていないので0人。
+
+### クレジット表示（義務）
+
+DUGA と同じく、指定のHTMLをそのまま出す必要がある。
+
+```html
+<a href="https://sokmil-ad.com/" target="_blank" rel="nofollow"><img src="https://sokmil-ad.com/api/credit/135x18.gif" alt="WEB SERVICE BY SOKMIL" width="135" height="18" border="0"></a>
+```
 
 ## 削除依頼
 
