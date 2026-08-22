@@ -8,6 +8,7 @@ dist/
 # 元になるデータ（public/data/*.json）だけを commit する。
 public/actress/
 public/kana/
+public/genre/
 public/ranking/index.html
 public/data/search-index.tsv
 public/data/featured.json

@@ -462,6 +462,39 @@ function renderRankingPage() {
   })
 }
 
+/** ジャンル別に、出演本数の多い順で並べたページ。 */
+function renderGenrePage(genre, rows, confirmedOn) {
+  const list = rows
+    .map((row, index) => `
+      <li>
+        <span class="rank-no">${index + 1}</span>
+        ${row.slug
+          ? `<a href="/actress/${encodeURIComponent(row.slug)}/">${escapeHtml(row.name)}</a>`
+          : escapeHtml(row.name)}
+        <span class="rank-count">${row.works}本</span>
+      </li>`)
+    .join('')
+
+  const description = `FANZA が「${genre.name}」に分類している作品${genre.works.toLocaleString('ja-JP')}件から、`
+    + `出演本数の多い方${rows.length.toLocaleString('ja-JP')}人を並べています。`
+
+  return shell({
+    title: `${genre.name}の作品に多く出ている方${rows.length}人｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/genre/${genre.slug}/`,
+    crumbs: `ジャンル ＞ ${escapeHtml(genre.name)}`,
+    body: `
+      <h1>${escapeHtml(genre.name)}の作品に多く出ている方</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <p class="confirmed">
+        FANZA が作品に付けているジャンルをそのまま数えたものです。
+        題名や紹介文からの推測は含みません。出演本数はFANZAの動画に限った数で、
+        他社で配信された作品は含みません。
+      </p>
+      <ol class="rank-list">${list}</ol>`,
+  })
+}
+
 /** 索引まわりのページの、共通のひな型。 */
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
@@ -550,8 +583,9 @@ footer a { color:#8b4054; }
 .review-form input, .review-form textarea { font:inherit; padding:10px 12px; border:1px solid #ecdfe2; border-radius:8px; background:#fff; color:inherit; }
 .review-form .button { align-self:flex-start; border:0; cursor:pointer; }
 .note { font-size:13px; color:#8a838f; }
-.rank-list { padding-left:1.6em; }
-.rank-list li { margin-bottom:6px; font-size:15px; }
+.rank-list { list-style:none; padding:0; margin:0; }
+.rank-list li { display:flex; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px solid #ecdfe2; font-size:15px; }
+.rank-no { min-width:2.4em; color:#8a838f; font-size:13px; }
 .rank-list a { color:#8b4054; text-decoration:none; }
 .rank-count { font-size:13px; color:#8a838f; margin-left:8px; }
 @media (prefers-color-scheme: dark) {
@@ -794,6 +828,31 @@ async function main() {
   await mkdir(rankingDir, { recursive: true })
   await writeFile(path.join(rankingDir, 'index.html'), renderRankingPage(), 'utf8')
 
+  // ジャンル別ページ。FANZA動画のジャンルで、出演本数を数えたもの。
+  let genreList = []
+  try {
+    const file = await readJson(path.join(publicDir, 'data/genres.json'))
+    genreList = file.genres ?? []
+  } catch {
+    console.log('ジャンルのデータが無いので、ジャンル別ページは作りません。')
+  }
+
+  if (genreList.length) {
+    const slugOf = new Map(targets.map((p) => [normaliseName(p.name), p.slug]))
+    await rm(path.join(publicDir, 'genre'), { recursive: true, force: true })
+
+    for (const genre of genreList) {
+      const rows = genre.performers
+        .filter((row) => row.works >= 2)     // 1本だけの人は並べても意味が薄い
+        .map((row) => ({ ...row, slug: slugOf.get(normaliseName(row.name)) || '' }))
+
+      const dir = path.join(publicDir, 'genre', genre.slug)
+      await mkdir(dir, { recursive: true })
+      await writeFile(path.join(dir, 'index.html'), renderGenrePage(genre, rows, confirmedOn), 'utf8')
+      console.log(`ジャンル「${genre.name}」: ${rows.length.toLocaleString('ja-JP')}人`)
+    }
+  }
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -830,6 +889,7 @@ async function main() {
     `${SITE_URL}/`,
     `${SITE_URL}/actress/`,
     `${SITE_URL}/ranking/`,
+    ...genreList.map((g) => `${SITE_URL}/genre/${g.slug}/`),
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
