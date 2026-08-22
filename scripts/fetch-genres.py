@@ -36,14 +36,10 @@ MAX_OFFSET = 50000
 
 # 取り上げるジャンルと、URLに使う名前。
 # FANZA のジャンル名をそのまま使い、独自の言い換えはしない。
+# いまはバックだけ。他のジャンルは5万件規模で時間がかかるため、
+# 必要になったら足す（1ジャンルあたり500ページ・約5分）。
 GENRES = [
     {'id': 6958, 'name': 'バック', 'slug': 'back'},
-    {'id': 6533, 'name': '巨乳', 'slug': 'kyonyu'},
-    {'id': 4025, 'name': '痴女', 'slug': 'chijo'},
-    {'id': 1027, 'name': '制服', 'slug': 'seifuku'},
-    {'id': 5001, 'name': '中出し', 'slug': 'nakadashi'},
-    {'id': 4111, 'name': '寝取り・寝取られ・NTR', 'slug': 'ntr'},
-    {'id': 6548, 'name': 'コスプレ', 'slug': 'cosplay'},
 ]
 
 
@@ -137,6 +133,15 @@ def main() -> None:
         })
 
         print(f"    → 出演者 {len(people):,}人（{len(seen):,}作品を確認）", flush=True)
+
+        # ジャンルごとに書き出す。途中で止まっても、取れたぶんは残る。
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps({
+            'confirmedOn': date.today().isoformat(),
+            'sourceLabel': 'FANZA アフィリエイト Web サービス（動画）',
+            'sourceUrl': 'https://affiliate.dmm.com/api/',
+            'genres': result,
+        }, ensure_ascii=False), encoding='utf-8')
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({

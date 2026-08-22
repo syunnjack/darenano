@@ -23,6 +23,7 @@ GitHub Pages を使えないため、2026-08-21 にこちらへ移した。
 | DUGA アフィリエイト Web サービス | `scripts/fetch-duga-performers.py` | 氏名・カナ・出演者ID |
 | DUGA 作品データCSV | `scripts/fetch-duga-csv.py` | 作品数・代表作品（リンク先）・収録期間・主なレーベル |
 | ソクミル WEBサービス | `scripts/fetch-sokmil.py` | 氏名・読み・**カップ数**・スリーサイズ・出身地・血液型・写真 |
+| FANZA動画（ジャンル別） | `scripts/fetch-genres.py` | ジャンルごとの出演本数（`/genre/<slug>/`） |
 
 出力先は `public/data/`。ページの生成は `scripts/build-site.mjs`。
 
@@ -133,6 +134,30 @@ DUGA と同じく、指定のHTMLをそのまま出す必要がある。
 ```html
 <a href="https://sokmil-ad.com/" target="_blank" rel="nofollow"><img src="https://sokmil-ad.com/api/credit/135x18.gif" alt="WEB SERVICE BY SOKMIL" width="135" height="18" border="0"></a>
 ```
+
+## 使えなかった出典
+
+| 出典 | 理由 |
+|---|---|
+| MGS動画 | 公開APIが無い |
+| DTI CASH | APIはサイト名と本数だけ、RSSは過去90日の99件で**出演者の欄が無い**。題名から人名を推測するしかなく、それは分類の推測になる |
+
+## ジャンル別ページ
+
+`/genre/back/` のように、FANZA動画のジャンルで出演本数を数えたページ。
+FANZA が作品に付けたジャンルだけを根拠にする。
+
+```
+FANZA_API_ID=xxx FANZA_AFFILIATE_ID=yyy python scripts/fetch-genres.py public/data/genres.json
+```
+
+いまは「バック」だけ（5,407作品・出演者1,974人、2本以上の930人を掲載）。
+他のジャンルは `GENRES` に足せば増える。**巨乳・痴女・中出しなどは5万件規模**で、
+1ジャンルあたり500ページ・5分ほどかかる。ジャンルごとに書き出すので、
+途中で止まっても取れたぶんは残る。
+
+出演本数はFANZAの動画に限った数で、他社で配信された作品は含まない。
+その旨をページに書いてある。
 
 ## 削除依頼
 
