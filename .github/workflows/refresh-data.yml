@@ -64,6 +64,15 @@ jobs:
         run: python scripts/fetch-sokmil.py public/data/sokmil.json
         continue-on-error: true
 
+      # ジャンル別の出演本数。ジャンル1つあたり500ページ・約5分かかる。
+      # ジャンルごとに書き出すので、途中で止まっても取れたぶんは残る。
+      - name: ジャンル別の出演本数を数え直す
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+        run: python scripts/fetch-genres.py public/data/genres.json
+        continue-on-error: true
+
       # 公開済みURLの記録（published-slugs.txt）を更新するために、ここでも生成しておく。
       # 生成したページ自体は .gitignore で除いてあるので commit されない。
       - name: ページを生成して、公開済みURLの記録を更新する
@@ -74,13 +83,13 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/published-slugs.txt
+          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/genres.json public/data/published-slugs.txt
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "データに変化はありませんでした。"
             exit 0
           fi
-          git commit -m "出演者データを取り直す（FANZA / DUGA）"
+          git commit -m "出演者データを取り直す（FANZA / DUGA / ソクミル）"
           git pull --rebase origin main
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
