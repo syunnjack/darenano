@@ -22,7 +22,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # refresh-data から呼ばれたときは、bot が commit したあとの main を取る。
+      # 既定では workflow を起動した時点の SHA になるため、
+      # せっかく取り直したデータを含まない状態で配信してしまう。
       - uses: actions/checkout@v5
+        with:
+          ref: main
 
       - uses: actions/setup-node@v5
         with:
