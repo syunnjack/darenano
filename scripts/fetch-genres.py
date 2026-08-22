@@ -16,6 +16,8 @@ GenreSearch でジャンル名から引き当てる。名前が見つからな�
 フロアIDも FloorList から取る。
 
 API の offset 上限は50,000。ジャンル1つあたり最大500ページ・約5分。
+13ジャンルで2時間近くかかるので、ONLY に slug を並べると、その分だけを
+取り直して残りは前回の結果を引き継ぐ（ONLY=hitozuma,nurse のように書く）。
 
 認証は環境変数から読む。リポジトリには置かない。
   FANZA_API_ID / FANZA_AFFILIATE_ID
@@ -46,13 +48,13 @@ GENRES = [
     {'name': 'バック', 'slug': 'back'},
     {'name': '巨乳', 'slug': 'kyonyu'},
     {'name': '美少女', 'slug': 'bishojo'},
-    {'name': '人妻', 'slug': 'hitozuma'},
+    {'name': '人妻・主婦', 'slug': 'hitozuma'},
     {'name': '熟女', 'slug': 'jukujo'},
     {'name': '痴女', 'slug': 'chijo'},
     {'name': '制服', 'slug': 'seifuku'},
     {'name': '水着', 'slug': 'mizugi'},
     {'name': 'メイド', 'slug': 'maid'},
-    {'name': 'ナース', 'slug': 'nurse'},
+    {'name': '看護婦・ナース', 'slug': 'nurse'},
     {'name': 'OL', 'slug': 'ol'},
     {'name': '女子大生', 'slug': 'joshidaisei'},
     {'name': 'スレンダー', 'slug': 'slender'},
@@ -195,9 +197,28 @@ def main() -> None:
     table = genre_ids(credentials, floor_id)
     print(f'ジャンルの一覧を取りました: {len(table):,}件（フロアID {floor_id}）', flush=True)
 
+    # ONLY が指定されていれば、その slug だけを取り直す。
+    # 残りは前回の結果をそのまま引き継ぐ。
+    only = {s.strip() for s in (os.environ.get('ONLY') or '').split(',') if s.strip()}
+    previous = {}
+
+    if only and output.exists():
+        try:
+            for row in json.loads(output.read_text(encoding='utf-8')).get('genres', []):
+                previous[row['slug']] = row
+            print(f'前回の結果を引き継ぎます: {len(previous)}ジャンル', flush=True)
+        except Exception as error:
+            print(f'前回の結果を読めませんでした（全部取り直します）: {error}', file=sys.stderr)
+            only = set()
+
     result = []
 
     for genre in GENRES:
+        if only and genre['slug'] not in only:
+            if genre['slug'] in previous:
+                result.append(previous[genre['slug']])
+            continue
+
         genre_id = table.get(genre['name'])
 
         if not genre_id:

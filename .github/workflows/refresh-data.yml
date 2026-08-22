@@ -15,6 +15,10 @@ on:
         description: 'DUGA も取り直す'
         type: boolean
         default: true
+      genres_only:
+        description: '取り直すジャンルの slug（カンマ区切り。空なら全部）'
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -70,6 +74,7 @@ jobs:
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
           FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          ONLY: ${{ inputs.genres_only }}
         run: python scripts/fetch-genres.py public/data/genres.json
         continue-on-error: true
 
