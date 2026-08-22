@@ -349,7 +349,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/genre/">ジャンル別</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
         <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
@@ -482,7 +482,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
     title: `${genre.name}の作品に多く出ている方${rows.length}人｜${SITE_NAME}`,
     description,
     canonical: `${SITE_URL}/genre/${genre.slug}/`,
-    crumbs: `ジャンル ＞ ${escapeHtml(genre.name)}`,
+    crumbs: `<a href="/genre/">ジャンル別</a> ＞ ${escapeHtml(genre.name)}`,
     body: `
       <h1>${escapeHtml(genre.name)}の作品に多く出ている方</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
@@ -492,6 +492,35 @@ function renderGenrePage(genre, rows, confirmedOn) {
         他社で配信された作品は含みません。
       </p>
       <ol class="rank-list">${list}</ol>`,
+  })
+}
+
+/** ジャンル別ページの入口。どのジャンルがあるかを並べる。 */
+function renderGenreIndexPage(genres, confirmedOn) {
+  const list = genres
+    .map((genre) => `
+      <li>
+        <a href="/genre/${encodeURIComponent(genre.slug)}/">${escapeHtml(genre.name)}</a>
+        <span class="rank-count">作品${genre.works.toLocaleString('ja-JP')}件</span>
+      </li>`)
+    .join('')
+
+  const description = `FANZA が作品に付けているジャンルのうち${genres.length}件について、`
+    + '出演本数の多い方を並べたページの一覧です。'
+
+  return shell({
+    title: `ジャンル別｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/genre/`,
+    crumbs: 'ジャンル別',
+    body: `
+      <h1>ジャンル別</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <p class="confirmed">
+        ジャンルの名前と分類は FANZA の表記をそのまま使っています。
+        当サイトが独自に付け直したものはありません。
+      </p>
+      <ul class="rank-list">${list}</ul>`,
   })
 }
 
@@ -518,7 +547,7 @@ function shell({ title, description, canonical, crumbs, body }) {
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/genre/">ジャンル別</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
         <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
@@ -851,6 +880,12 @@ async function main() {
       await writeFile(path.join(dir, 'index.html'), renderGenrePage(genre, rows, confirmedOn), 'utf8')
       console.log(`ジャンル「${genre.name}」: ${rows.length.toLocaleString('ja-JP')}人`)
     }
+
+    await writeFile(
+      path.join(publicDir, 'genre', 'index.html'),
+      renderGenreIndexPage(genreList, confirmedOn),
+      'utf8'
+    )
   }
 
   // 検索用の索引。JSON より軽いので TSV にする。
@@ -889,6 +924,7 @@ async function main() {
     `${SITE_URL}/`,
     `${SITE_URL}/actress/`,
     `${SITE_URL}/ranking/`,
+    ...(genreList.length ? [`${SITE_URL}/genre/`] : []),
     ...genreList.map((g) => `${SITE_URL}/genre/${g.slug}/`),
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),

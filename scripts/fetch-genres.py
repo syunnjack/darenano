@@ -1,6 +1,6 @@
 """FANZA動画のジャンル別に、出演者ごとの出演本数を数える。
 
-出典: FANZA アフィリエイト Web サービス（ItemList API・動画）
+出典: FANZA アフィリエイト Web サービス（FloorList / GenreSearch / ItemList）
       https://affiliate.dmm.com/api/
 
 ActressSearch はプロフィールしか返さないため、「どのジャンルの作品に
@@ -10,7 +10,12 @@ ActressSearch はプロフィールしか返さないため、「どのジャン
 作品のタイトルは持たない。露骨な語を含むものが多いため。
 数えるのは出演本数だけで、ジャンル名は FANZA の表記をそのまま使う。
 
-API の offset 上限は50,000。ジャンル1つあたり最大500ページ。
+**ジャンルIDは書かない。** 数字を書き写すと取り違えても気づけないので、
+GenreSearch でジャンル名から引き当てる。名前が見つからないジャンルは
+黙って飛ばす（勝手なIDで別のジャンルを数えないため）。
+フロアIDも FloorList から取る。
+
+API の offset 上限は50,000。ジャンル1つあたり最大500ページ・約5分。
 
 認証は環境変数から読む。リポジトリには置かない。
   FANZA_API_ID / FANZA_AFFILIATE_ID
@@ -29,29 +34,37 @@ from collections import Counter
 from datetime import date
 from pathlib import Path
 
-API = 'https://api.dmm.com/affiliate/v3/ItemList'
+BASE = 'https://api.dmm.com/affiliate/v3'
 HITS = 100
 INTERVAL = 0.5
 MAX_OFFSET = 50000
 
 # 取り上げるジャンルと、URLに使う名前。
-# FANZA のジャンル名をそのまま使い、独自の言い換えはしない。
-# いまはバックだけ。他のジャンルは5万件規模で時間がかかるため、
-# 必要になったら足す（1ジャンルあたり500ページ・約5分）。
+# 名前は FANZA の表記のまま。こちらで言い換えると、GenreSearch で
+# 引き当てられなくなる。slug は URL 用のローマ字。
 GENRES = [
-    {'id': 6958, 'name': 'バック', 'slug': 'back'},
+    {'name': 'バック', 'slug': 'back'},
+    {'name': '巨乳', 'slug': 'kyonyu'},
+    {'name': '美少女', 'slug': 'bishojo'},
+    {'name': '人妻', 'slug': 'hitozuma'},
+    {'name': '熟女', 'slug': 'jukujo'},
+    {'name': '痴女', 'slug': 'chijo'},
+    {'name': '制服', 'slug': 'seifuku'},
+    {'name': '水着', 'slug': 'mizugi'},
+    {'name': 'メイド', 'slug': 'maid'},
+    {'name': 'ナース', 'slug': 'nurse'},
+    {'name': 'OL', 'slug': 'ol'},
+    {'name': '女子大生', 'slug': 'joshidaisei'},
+    {'name': 'スレンダー', 'slug': 'slender'},
 ]
 
 
-def call(credentials: dict, genre_id: int, offset: int) -> dict:
-    params = dict(credentials, output='json', site='FANZA', service='digital',
-                  floor='videoa', article='genre', article_id=genre_id,
-                  hits=HITS, offset=offset, sort='rank')
+def call(endpoint: str, params: dict) -> dict:
     query = urllib.parse.urlencode(params)
 
     for attempt in range(5):
         try:
-            with urllib.request.urlopen(f'{API}?{query}', timeout=60) as response:
+            with urllib.request.urlopen(f'{BASE}/{endpoint}?{query}', timeout=60) as response:
                 return json.loads(response.read().decode())
         except Exception as error:
             if attempt == 4:
@@ -60,6 +73,111 @@ def call(credentials: dict, genre_id: int, offset: int) -> dict:
             time.sleep(3 * (attempt + 1))
 
     return {}
+
+
+def videoa_floor_id(credentials: dict) -> str:
+    """動画（videoa）のフロアIDを FloorList から取る。数字は書き写さない。"""
+    payload = call('FloorList', dict(credentials, output='json')).get('result', {})
+
+    for site in payload.get('site') or []:
+        if site.get('code') != 'FANZA':
+            continue
+        for service in site.get('service') or []:
+            if service.get('code') != 'digital':
+                continue
+            for floor in service.get('floor') or []:
+                if floor.get('code') == 'videoa':
+                    return str(floor.get('id'))
+
+    raise SystemExit('FloorList に FANZA/digital/videoa が見つかりませんでした。')
+
+
+def genre_ids(credentials: dict, floor_id: str) -> dict:
+    """ジャンル名 → ジャンルID の対応表を GenreSearch から作る。"""
+    table = {}
+    offset = 1
+
+    while True:
+        payload = call('GenreSearch', dict(
+            credentials, output='json', floor_id=floor_id,
+            hits=500, offset=offset,
+        )).get('result', {})
+
+        rows = payload.get('genre') or []
+        if not rows:
+            break
+
+        for row in rows:
+            name = (row.get('name') or '').strip()
+            if name and name not in table:
+                table[name] = str(row.get('genre_id'))
+
+        offset += 500
+        if offset > int(payload.get('total_count') or 0):
+            break
+
+        time.sleep(INTERVAL)
+
+    return table
+
+
+def count_performers(credentials: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int]:
+    counts = Counter()
+    readings = {}
+    ids = {}
+    seen = set()
+    offset = 1
+    total = None
+
+    while True:
+        payload = call('ItemList', dict(
+            credentials, output='json', site='FANZA', service='digital',
+            floor='videoa', article='genre', article_id=genre_id,
+            hits=HITS, offset=offset, sort='rank',
+        )).get('result', {})
+
+        items = payload.get('items') or []
+
+        if total is None:
+            total = int(payload.get('total_count') or 0)
+
+        if not items:
+            break
+
+        for item in items:
+            content_id = item.get('content_id')
+            if content_id in seen:
+                continue
+            seen.add(content_id)
+
+            for actress in (item.get('iteminfo') or {}).get('actress') or []:
+                name = (actress.get('name') or '').strip()
+                if not name:
+                    continue
+                counts[name] += 1
+                if actress.get('ruby'):
+                    readings.setdefault(name, actress['ruby'])
+                if actress.get('id'):
+                    ids.setdefault(name, str(actress['id']))
+
+        offset += HITS
+
+        if offset > min(total or 0, MAX_OFFSET):
+            break
+
+        time.sleep(INTERVAL)
+
+    return counts, readings, ids, total or 0, len(seen)
+
+
+def write(output: Path, result: list) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps({
+        'confirmedOn': date.today().isoformat(),
+        'sourceLabel': 'FANZA アフィリエイト Web サービス（動画）',
+        'sourceUrl': 'https://affiliate.dmm.com/api/',
+        'genres': result,
+    }, ensure_ascii=False), encoding='utf-8')
 
 
 def main() -> None:
@@ -73,49 +191,20 @@ def main() -> None:
 
     credentials = {'api_id': api_id, 'affiliate_id': affiliate_id}
 
+    floor_id = videoa_floor_id(credentials)
+    table = genre_ids(credentials, floor_id)
+    print(f'ジャンルの一覧を取りました: {len(table):,}件（フロアID {floor_id}）', flush=True)
+
     result = []
 
     for genre in GENRES:
-        counts = Counter()
-        readings = {}
-        ids = {}
-        seen = set()
-        offset = 1
-        total = None
+        genre_id = table.get(genre['name'])
 
-        while True:
-            payload = call(credentials, genre['id'], offset).get('result', {})
-            items = payload.get('items') or []
+        if not genre_id:
+            print(f"  {genre['name']}: FANZA のジャンル一覧に無いので飛ばします", flush=True)
+            continue
 
-            if total is None:
-                total = int(payload.get('total_count') or 0)
-                print(f"  {genre['name']}: {total:,}件", flush=True)
-
-            if not items:
-                break
-
-            for item in items:
-                content_id = item.get('content_id')
-                if content_id in seen:
-                    continue
-                seen.add(content_id)
-
-                for actress in (item.get('iteminfo') or {}).get('actress') or []:
-                    name = (actress.get('name') or '').strip()
-                    if not name:
-                        continue
-                    counts[name] += 1
-                    if actress.get('ruby'):
-                        readings.setdefault(name, actress['ruby'])
-                    if actress.get('id'):
-                        ids.setdefault(name, str(actress['id']))
-
-            offset += HITS
-
-            if offset > min(total or 0, MAX_OFFSET):
-                break
-
-            time.sleep(INTERVAL)
+        counts, readings, ids, total, scanned = count_performers(credentials, genre_id)
 
         people = [
             {'name': name, 'works': count,
@@ -124,32 +213,21 @@ def main() -> None:
         ]
 
         result.append({
-            'id': genre['id'],
+            'id': int(genre_id),
             'name': genre['name'],
             'slug': genre['slug'],
-            'works': total or 0,
-            'scanned': len(seen),
+            'works': total,
+            'scanned': scanned,
             'performers': people,
         })
 
-        print(f"    → 出演者 {len(people):,}人（{len(seen):,}作品を確認）", flush=True)
+        print(f"  {genre['name']}: 作品{total:,}件 → 出演者 {len(people):,}人"
+              f"（{scanned:,}作品を確認）", flush=True)
 
         # ジャンルごとに書き出す。途中で止まっても、取れたぶんは残る。
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps({
-            'confirmedOn': date.today().isoformat(),
-            'sourceLabel': 'FANZA アフィリエイト Web サービス（動画）',
-            'sourceUrl': 'https://affiliate.dmm.com/api/',
-            'genres': result,
-        }, ensure_ascii=False), encoding='utf-8')
+        write(output, result)
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps({
-        'confirmedOn': date.today().isoformat(),
-        'sourceLabel': 'FANZA アフィリエイト Web サービス（動画）',
-        'sourceUrl': 'https://affiliate.dmm.com/api/',
-        'genres': result,
-    }, ensure_ascii=False), encoding='utf-8')
+    write(output, result)
 
     print()
     print(f'{len(result)}ジャンルを書き出しました → {output}')
