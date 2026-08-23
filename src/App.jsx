@@ -58,6 +58,7 @@ function useSearchIndex() {
 function App() {
   const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const [featured, setFeatured] = useState(null)
+  const [genres, setGenres] = useState([])
   const { index, loading, load } = useSearchIndex()
 
   useEffect(() => {
@@ -65,6 +66,13 @@ function App() {
       .then((response) => response.json())
       .then(setFeatured)
       .catch(() => setFeatured(null))
+  }, [])
+
+  useEffect(() => {
+    fetch('/data/genre-index.json')
+      .then((response) => response.json())
+      .then((file) => setGenres(file.genres ?? []))
+      .catch(() => setGenres([]))
   }, [])
 
   useEffect(() => {
@@ -163,6 +171,29 @@ function App() {
           </ul>
           <p className="more">
             <a href="/actress/">五十音索引ですべて見る</a>
+          </p>
+        </section>
+      )}
+
+      {!searching && genres.length > 0 && (
+        <section className="genres">
+          <h2>ジャンルから探す</h2>
+          <p className="genres-lead">
+            FANZA・DUGA・ソクミルが作品に付けているジャンルごとに、
+            出演本数の多い方を並べています。
+          </p>
+          <ul className="genre-chips">
+            {genres.map((genre) => (
+              <li key={genre.slug}>
+                <a href={`/genre/${genre.slug}/`}>
+                  <span className="genre-name">{genre.name}</span>
+                  <span className="genre-count">{genre.people.toLocaleString('ja-JP')}人</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="more">
+            <a href="/genre/">ジャンル別の一覧を見る</a>
           </p>
         </section>
       )}

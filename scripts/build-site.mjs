@@ -505,7 +505,35 @@ function renderGenrePage(genre, rows, confirmedOn) {
         DUGA とソクミルは人気順の上位までを数えているため、
         実際の出演本数より少なく出ることがあります。
       </p>
-      <ol class="rank-list">${list}</ol>`,
+      <ol class="rank-list">${list}</ol>
+      <script type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: `${genre.name}の作品に多く出ている方`,
+        url: `${SITE_URL}/genre/${genre.slug}/`,
+        description,
+        inLanguage: 'ja',
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: `${SITE_URL}/` },
+        breadcrumb: {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: SITE_NAME, item: `${SITE_URL}/` },
+            { '@type': 'ListItem', position: 2, name: 'ジャンル別', item: `${SITE_URL}/genre/` },
+            { '@type': 'ListItem', position: 3, name: genre.name, item: `${SITE_URL}/genre/${genre.slug}/` },
+          ],
+        },
+        // 上位50人だけ。全員入れるとページが重くなる。
+        mainEntity: {
+          '@type': 'ItemList',
+          numberOfItems: rows.length,
+          itemListElement: rows.slice(0, 50).map((row, index) => ({
+            '@type': 'ListItem',
+            position: index + 1,
+            name: row.name,
+            ...(row.slug ? { url: `${SITE_URL}/actress/${encodeURIComponent(row.slug)}/` } : {}),
+          })),
+        },
+      })}</script>`,
   })
 }
 
@@ -537,7 +565,25 @@ function renderGenreIndexPage(genres, confirmedOn) {
         社によって呼び方が違う場合（制服／制服女子など）は、
         実在する名前だけを突き合わせています。
       </p>
-      <ul class="rank-list">${list}</ul>`,
+      <ul class="rank-list">${list}</ul>
+      <script type="application/ld+json">${JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: `ジャンル別｜${SITE_NAME}`,
+        url: `${SITE_URL}/genre/`,
+        description,
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: `${SITE_URL}/` },
+        mainEntity: {
+          '@type': 'ItemList',
+          numberOfItems: genres.length,
+          itemListElement: genres.map((genre, index) => ({
+            '@type': 'ListItem',
+            position: index + 1,
+            name: genre.name,
+            url: `${SITE_URL}/genre/${genre.slug}/`,
+          })),
+        },
+      })}</script>`,
   })
 }
 
@@ -902,6 +948,23 @@ async function main() {
     await writeFile(
       path.join(publicDir, 'genre', 'index.html'),
       renderGenreIndexPage(genreList, confirmedOn),
+      'utf8'
+    )
+
+    // トップページの見出しに並べるための、軽い一覧。
+    // 出演者は入れない（数百KBになるため）。
+    await writeFile(
+      path.join(publicDir, 'data/genre-index.json'),
+      JSON.stringify({
+        confirmedOn,
+        genres: genreList.map((g) => ({
+          name: g.name,
+          slug: g.slug,
+          aka: g.aka ?? [],
+          works: g.works,
+          people: g.performers.filter((row) => row.works >= 2).length,
+        })),
+      }),
       'utf8'
     )
   }

@@ -7,7 +7,11 @@
   --muted: #5f5869;
   --rule: #e8dee1;
   --accent: #8b4054;
+  --accent-soft: #f3e6ea;
+  --accent-2: #3f5d75;
+  --accent-2-soft: #e7eef4;
   --warn: #b0453c;
+  --shadow: 0 1px 2px rgba(28, 26, 34, .06), 0 8px 24px rgba(28, 26, 34, .05);
 
   font: 16px/1.7 'Hiragino Sans', 'Yu Gothic', system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
@@ -26,7 +30,11 @@
     --muted: #a9a2b4;
     --rule: #332d3d;
     --accent: #f0908a;
+    --accent-soft: #3a2932;
+    --accent-2: #8fb4d0;
+    --accent-2-soft: #23303b;
     --warn: #f0908a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
   }
 }
 

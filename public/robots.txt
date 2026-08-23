@@ -1,4 +1,43 @@
 User-agent: *
 Allow: /
 
+# 生成AIのクローラーにも読ませる。載せているのは各社APIが公開している
+# 情報だけで、隠す理由がない。llms.txt に、数え方の制約と載せていない
+# ものを書いてあるので、そちらも読めるようにしておく。
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
 Sitemap: https://darekore.jp/sitemap.xml
