@@ -166,9 +166,10 @@ def fanza_genres(cred: dict, floor_id: str) -> dict:
     return table
 
 
-def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int]:
+def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int, str]:
     counts, readings, ids, seen = Counter(), {}, {}, set()
     offset, total = 1, None
+    top = ''   # 人気順1位の作品。ジャンル一覧のURLをAPIが返さないため、代わりに使う。
 
     while True:
         payload = fetch(f'{FANZA_BASE}/ItemList?' + urllib.parse.urlencode(dict(
@@ -187,6 +188,8 @@ def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, in
             if key in seen:
                 continue
             seen.add(key)
+            if not top:
+                top = item.get('affiliateURL') or ''
             for person in (item.get('iteminfo') or {}).get('actress') or []:
                 name = (person.get('name') or '').strip()
                 if not name:
@@ -202,7 +205,7 @@ def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, in
             break
         time.sleep(0.5)
 
-    return counts, readings, ids, total or 0, len(seen)
+    return counts, readings, ids, total or 0, len(seen), top
 
 
 # ---------------------------------------------------------------- DUGA
@@ -235,9 +238,10 @@ def duga_categories(cred: dict) -> dict:
     return table
 
 
-def duga_count(cred: dict, category_id: str) -> tuple[Counter, int, int]:
+def duga_count(cred: dict, category_id: str) -> tuple[Counter, int, int, str]:
     counts, seen = Counter(), set()
     offset, total = 1, None
+    top = ''
 
     while True:
         payload = fetch(f'{DUGA_API}?' + urllib.parse.urlencode(dict(
@@ -256,6 +260,8 @@ def duga_count(cred: dict, category_id: str) -> tuple[Counter, int, int]:
             if key in seen:
                 continue
             seen.add(key)
+            if not top:
+                top = item.get('affiliateurl') or ''
             for performer in (item.get('performer') or []):
                 data = performer.get('data')
                 rows = data if isinstance(data, list) else [data]
@@ -271,13 +277,14 @@ def duga_count(cred: dict, category_id: str) -> tuple[Counter, int, int]:
             break
         time.sleep(1.2)
 
-    return counts, total or 0, len(seen)
+    return counts, total or 0, len(seen), top
 
 
 # ---------------------------------------------------------------- ソクミル
 
-def sokmil_genres(cred: dict) -> dict:
+def sokmil_genres(cred: dict) -> tuple[dict, dict]:
     table = {}
+    urls = {}          # ジャンルID → アフィリエイトURL（APIが返す一覧ページ）
     offset = 1
 
     while True:
@@ -292,6 +299,8 @@ def sokmil_genres(cred: dict) -> dict:
             name = (row.get('name') or '').strip()
             if name:
                 table.setdefault(normalise(name), str(row.get('id')))
+            if row.get('affiliateURL'):
+                urls.setdefault(str(row.get('id')), row['affiliateURL'])
 
         total = int(payload.get('total_count') or 0)
         offset += 100
@@ -299,7 +308,7 @@ def sokmil_genres(cred: dict) -> dict:
             break
         time.sleep(1.5)
 
-    return table
+    return table, urls
 
 
 def sokmil_count(cred: dict, genre_id: str) -> tuple[Counter, dict, int, int]:
@@ -390,9 +399,9 @@ def main() -> None:
     else:
         print('DUGA の認証情報が無いので、DUGA は数えません。', file=sys.stderr)
 
-    sokmil_table = {}
+    sokmil_table, sokmil_urls = {}, {}
     if all(sokmil.values()):
-        sokmil_table = sokmil_genres(sokmil)
+        sokmil_table, sokmil_urls = sokmil_genres(sokmil)
         print(f'ソクミルのジャンル: {len(sokmil_table):,}件', flush=True)
     else:
         print('ソクミルの認証情報が無いので、ソクミルは数えません。', file=sys.stderr)
@@ -423,10 +432,11 @@ def main() -> None:
         per_source = {}
         readings, dmm_ids = {}, {}
         works, scanned = {}, {}
+        fanza_top = duga_top = ''
 
         fanza_id = look_up(fanza_table, genre, 'fanza')
         if fanza_id:
-            counts, reads, ids, total, seen = fanza_count(fanza, fanza_id)
+            counts, reads, ids, total, seen, fanza_top = fanza_count(fanza, fanza_id)
             per_source['fanza'] = counts
             readings.update(reads)
             dmm_ids.update(ids)
@@ -438,7 +448,7 @@ def main() -> None:
 
         duga_id = look_up(duga_table, genre, 'duga') if duga_table else ''
         if duga_id:
-            counts, total, seen = duga_count(duga, duga_id)
+            counts, total, seen, duga_top = duga_count(duga, duga_id)
             per_source['duga'] = counts
             works['duga'], scanned['duga'] = total, seen
             merged.update(counts)
@@ -475,9 +485,14 @@ def main() -> None:
         entry = {
             'name': genre['name'],
             'slug': genre['slug'],
-            # 各社のジャンル一覧へリンクするために、引き当てたIDを残す。
-            'ids': {k: v for k, v in
-                    (('fanza', fanza_id), ('duga', duga_id), ('sokmil', sokmil_id)) if v},
+            # 各社への行き先。**APIが返したURLだけ**を使う。
+            # FANZAとDUGAはジャンル一覧のURLを返さないので、人気順1位の作品へ送る。
+            # ソクミルはジャンル一覧のURLを返すので、そのまま使う。
+            'links': {k: v for k, v in (
+                ('fanza', fanza_top),
+                ('duga', duga_top),
+                ('sokmil', sokmil_urls.get(sokmil_id, '') if sokmil_id else ''),
+            ) if v},
             'works': sum(works.values()),
             'worksBySource': works,
             'scannedBySource': scanned,

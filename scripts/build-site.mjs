@@ -420,8 +420,28 @@ function renderIndexPage(groups, total, detailed, confirmedOn) {
 
 /** 頭文字ごとの一覧ページ。 */
 function renderHeadPage(head, members, confirmedOn, groups) {
+  // 名前を押すと当サイトの出演者ページへ。その横に、各社の作品一覧への
+  // リンクを小さく置く。URLは各社のAPIが返したものだけを使う。
   const links = members
-    .map((p) => `<li><a href="/actress/${p.slug}/">${escapeHtml(p.name)}${p.reading ? `<span class="reading-small">${escapeHtml(p.reading)}</span>` : ''}</a></li>`)
+    .map((p) => {
+      const shops = [
+        ['FANZA', p.fanza?.listUrl],
+        ['ソクミル', p.sokmil?.affiliateURL],
+        ['DUGA', p.duga?.productId
+          ? `https://click.duga.jp/ppv/${encodeURIComponent(p.duga.productId)}/${DUGA_AGENT_ID}-01`
+          : ''],
+      ]
+        .filter(([, url]) => url)
+        .map(([label, url]) =>
+          `<a class="shop" href="${escapeHtml(url)}" target="_blank" rel="nofollow sponsored noopener">${label}</a>`)
+        .join('')
+
+      return `<li>`
+        + `<a class="who" href="/actress/${p.slug}/">${escapeHtml(p.name)}`
+        + `${p.reading ? `<span class="reading-small">${escapeHtml(p.reading)}</span>` : ''}</a>`
+        + (shops ? `<span class="shops">${shops}</span>` : '')
+        + `</li>`
+    })
     .join('')
 
   const nav = groups
@@ -444,7 +464,8 @@ function renderHeadPage(head, members, confirmedOn, groups) {
       <h1>${escapeHtml(label)}の出演者</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <nav class="kana-nav">${nav}</nav>
-      <ul class="name-list">${links}</ul>`,
+      <ul class="name-list">${links}</ul>
+      <p class="note">名前を押すと当サイトのページへ、社名を押すと各社の作品一覧へ移動します。社名のリンクは広告です。</p>`,
   })
 }
 
@@ -492,6 +513,20 @@ function renderGenrePage(genre, rows, confirmedOn) {
   const aka = genre.aka ?? []
   const akaText = aka.length ? `${aka.join('・')}とも呼ばれます。` : ''
 
+  // 各社への行き先。fetch-genres.py が **APIから受け取ったURLだけ** を持っている。
+  // FANZAとDUGAはジャンル一覧のURLを返さないため、人気順1位の作品へ送る。
+  const shopLabels = {
+    fanza: `FANZA で「${genre.name}」の人気1位の作品を見る`,
+    duga: `DUGA で「${genre.name}」の人気1位の作品を見る`,
+    sokmil: `ソクミル で「${genre.name}」の作品一覧を見る`,
+  }
+  const shops = Object.entries(genre.links ?? {}).filter(([key, url]) => url && shopLabels[key])
+  const shopsHtml = shops.length
+    ? `<p class="works">${shops
+        .map(([key, url]) => `<a class="button" href="${escapeHtml(url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(shopLabels[key])}</a>`)
+        .join('')}<span class="pr">広告</span></p>`
+    : ''
+
   const description = `${used.map((k) => sourceNames[k]).join('・')} が「${genre.name}」に分類している`
     + `作品${genre.works.toLocaleString('ja-JP')}件から、`
     + `出演本数の多い方${rows.length.toLocaleString('ja-JP')}人を並べています。`
@@ -513,6 +548,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
         DUGA とソクミルは人気順の上位までを数えているため、
         実際の出演本数より少なく出ることがあります。
       </p>
+      ${shopsHtml}
       <ol class="rank-list">${list}</ol>
       <script type="application/ld+json">${JSON.stringify({
         '@context': 'https://schema.org',
@@ -677,6 +713,11 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .name-list { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:2px 12px; }
 .name-list a { display:block; padding:3px 0; color:#3b3546; text-decoration:none; font-size:14px; }
 .name-list a:hover { color:#8b4054; text-decoration:underline; }
+.name-list li { padding:4px 0; border-bottom:1px solid #f5eef0; }
+.name-list .who { display:block; }
+.shops { display:flex; gap:6px; margin-top:2px; flex-wrap:wrap; }
+.shops .shop { display:inline-flex; align-items:center; min-height:26px; padding:0 8px; font-size:11px; color:#8b4054; text-decoration:none; border:1px solid #ecdfe2; border-radius:999px; background:#fff; }
+.shops .shop:hover { border-color:#8b4054; background:#f3e6ea; text-decoration:none; }
 footer { margin-top:44px; border-top:1px solid #ecdfe2; padding-top:16px; font-size:13px; color:#7a7484; }
 footer a { color:#8b4054; }
 /* 主要な行き先。指で押せる大きさ（40px以上）を確保する。 */
@@ -730,6 +771,8 @@ footer a { color:#8b4054; }
   .profile th { background:#272230; color:#b8b1c2; }
   .profile th, .profile td, .profile, .thin, .chips a, .kana-nav a { border-color:#332d3d; }
   .name-list a { color:#ded8e6; }
+  .name-list li { border-color:#2a2532; }
+  .shops .shop { border-color:#332d3d; background:#211e28; color:#f0908a; }
   .crumbs a, .sources a, .chips a, .kana-nav a, footer a, .name-list a:hover { color:#f0908a; }
   .site-head { border-color:#332d3d; }
   .site-head .site-name { background:linear-gradient(92deg,#f0908a,#8fb4d0); -webkit-background-clip:text; background-clip:text; color:transparent; }
