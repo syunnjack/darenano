@@ -68,12 +68,16 @@ jobs:
         run: python scripts/fetch-sokmil.py public/data/sokmil.json
         continue-on-error: true
 
-      # ジャンル別の出演本数。ジャンル1つあたり500ページ・約5分かかる。
+      # ジャンル別の出演本数。3社ぶんで、ジャンル1つあたり10分ほどかかる。
       # ジャンルごとに書き出すので、途中で止まっても取れたぶんは残る。
       - name: ジャンル別の出演本数を数え直す
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
           FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
+          DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
+          SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}
+          SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
           ONLY: ${{ inputs.genres_only }}
         run: python scripts/fetch-genres.py public/data/genres.json
         continue-on-error: true

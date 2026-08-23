@@ -1,33 +1,43 @@
-"""FANZA動画のジャンル別に、出演者ごとの出演本数を数える。
+"""ジャンル別に、出演者ごとの出演本数を数える。FANZA・DUGA・ソクミルの3社。
 
-出典: FANZA アフィリエイト Web サービス（FloorList / GenreSearch / ItemList）
-      https://affiliate.dmm.com/api/
+出典:
+  FANZA アフィリエイト Web サービス  https://affiliate.dmm.com/api/
+  DUGA アフィリエイト Web サービス   https://affiliate.duga.jp/
+  ソクミルアフィリエイト WEBサービス  https://sokmil-ad.com/
 
-ActressSearch はプロフィールしか返さないため、「どのジャンルの作品に
-何本出ているか」は分からない。ItemList をジャンルで引くと、作品ごとの
-出演者（actress）が入っているので、それを数える。
+出演者検索のAPIはプロフィールしか返さないため、「どのジャンルの作品に
+何本出ているか」は分からない。作品をジャンルで引くと出演者が入っている
+ので、それを数える。
 
 作品のタイトルは持たない。露骨な語を含むものが多いため。
-数えるのは出演本数だけで、ジャンル名は FANZA の表記をそのまま使う。
+数えるのは出演本数だけで、ジャンル名は各社の表記をそのまま使う。
 
-**ジャンルIDは書かない。** 数字を書き写すと取り違えても気づけないので、
-GenreSearch でジャンル名から引き当てる。名前が見つからないジャンルは
-黙って飛ばす（勝手なIDで別のジャンルを数えないため）。
-フロアIDも FloorList から取る。
+**IDは書き写さない。** 数字を書き写すと取り違えても気づけないので、
+各社のジャンル一覧をAPIから取り、名前で引き当てる。名前が見つからない
+ジャンルはその社を飛ばす（勝手なIDで別のジャンルを数えないため）。
 
-API の offset 上限は50,000。ジャンル1つあたり最大500ページ・約5分。
-13ジャンルで2時間近くかかるので、ONLY に slug を並べると、その分だけを
-取り直して残りは前回の結果を引き継ぐ（ONLY=hitozuma,nurse のように書く）。
+  FANZA   FloorList でフロアID → GenreSearch で名前→ID
+  ソクミル Genre API で名前→ID（586件）
+  DUGA    カテゴリ一覧のAPIが無いので、作品を広く見て名前→ID を作る
+
+社によって呼び方が違うものがある（制服／制服女子、レズビアン／レズ）。
+その場合は候補を並べ、**実在した名前だけ**を使う。
+
+数える量には上限がある。FANZAは offset 上限の50,000件、DUGAとソクミルは
+時間の都合で人気順の上位から SCAN_LIMIT 件まで。ページにもその旨を出す。
 
 認証は環境変数から読む。リポジトリには置かない。
   FANZA_API_ID / FANZA_AFFILIATE_ID
+  DUGA_APP_ID / DUGA_AGENT_ID
+  SOKMIL_API_KEY / SOKMIL_AFFILIATE_ID
+  ONLY に slug を並べると、その分だけ取り直して残りは前回の結果を引き継ぐ
 
 使い方:
-  FANZA_API_ID=xxx FANZA_AFFILIATE_ID=yyy \
-    python scripts/fetch-genres.py public/data/genres.json
+  FANZA_API_ID=xxx ... python scripts/fetch-genres.py public/data/genres.json
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -36,57 +46,66 @@ from collections import Counter
 from datetime import date
 from pathlib import Path
 
-BASE = 'https://api.dmm.com/affiliate/v3'
-HITS = 100
-INTERVAL = 0.5
-MAX_OFFSET = 50000
+FANZA_BASE = 'https://api.dmm.com/affiliate/v3'
+DUGA_API = 'http://affapi.duga.jp/search'
+SOKMIL_BASE = 'https://sokmil-ad.com/api/v1'
 
-# 取り上げるジャンルと、URLに使う名前。
-# 名前は FANZA の表記のまま。こちらで言い換えると、GenreSearch で
-# 引き当てられなくなる。slug は URL 用のローマ字。
+FANZA_MAX_OFFSET = 50000      # API の上限
+SCAN_LIMIT = 5000             # DUGA・ソクミルはここまで（時間の都合）
+DUGA_CATEGORY_SCAN = 4000     # カテゴリ名→ID を作るために見る作品数
+
+# 取り上げるジャンル。名前は FANZA の表記のまま。
+# duga / sokmil は、その社での呼び方が違うときの候補。
+# 実在した名前だけを使い、どれも無ければその社は飛ばす。
 GENRES = [
     {'name': 'バック', 'slug': 'back'},
     {'name': '騎乗位', 'slug': 'kijoi'},
     {'name': '素人', 'slug': 'shirouto'},
     {'name': 'ハメ撮り', 'slug': 'hamedori'},
     {'name': 'コスプレ', 'slug': 'cosplay'},
-    {'name': 'レズビアン', 'slug': 'lesbian'},
+    {'name': 'レズビアン', 'slug': 'lesbian', 'duga': ['レズ'], 'sokmil': ['レズ']},
     {'name': '巫女', 'slug': 'miko'},
     {'name': '中出し', 'slug': 'nakadashi'},
-    {'name': '巨乳', 'slug': 'kyonyu'},
+    {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
-    {'name': '人妻・主婦', 'slug': 'hitozuma'},
+    {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
     {'name': '熟女', 'slug': 'jukujo'},
     {'name': '痴女', 'slug': 'chijo'},
-    {'name': '制服', 'slug': 'seifuku'},
+    {'name': '制服', 'slug': 'seifuku', 'duga': ['制服女子']},
     {'name': '水着', 'slug': 'mizugi'},
     {'name': 'メイド', 'slug': 'maid'},
-    {'name': '看護婦・ナース', 'slug': 'nurse'},
+    {'name': '看護婦・ナース', 'slug': 'nurse', 'duga': ['ナース'], 'sokmil': ['ナース']},
     {'name': 'OL', 'slug': 'ol'},
     {'name': '女子大生', 'slug': 'joshidaisei'},
     {'name': 'スレンダー', 'slug': 'slender'},
 ]
 
 
-def call(endpoint: str, params: dict) -> dict:
-    query = urllib.parse.urlencode(params)
-
-    for attempt in range(5):
+def fetch(url: str, tries: int = 5, wait: float = 3.0) -> dict:
+    for attempt in range(tries):
         try:
-            with urllib.request.urlopen(f'{BASE}/{endpoint}?{query}', timeout=60) as response:
-                return json.loads(response.read().decode())
+            with urllib.request.urlopen(url, timeout=60) as response:
+                return json.loads(response.read().decode('utf-8', 'replace'))
         except Exception as error:
-            if attempt == 4:
-                raise
-            print(f'    再試行 {attempt + 1}/4: {error}', file=sys.stderr)
-            time.sleep(3 * (attempt + 1))
-
+            if attempt == tries - 1:
+                print(f'    あきらめます: {error}', file=sys.stderr)
+                return {}
+            time.sleep(wait * (attempt + 1))
     return {}
 
 
-def videoa_floor_id(credentials: dict) -> str:
-    """動画（videoa）のフロアIDを FloorList から取る。数字は書き写さない。"""
-    payload = call('FloorList', dict(credentials, output='json')).get('result', {})
+def normalise(name: str) -> str:
+    """全角半角や中黒の違いを吸収して、名前を突き合わせる。"""
+    text = str(name or '').strip()
+    text = re.sub(r'[\s　]+', '', text)
+    return text.replace('・', '').replace('･', '').lower()
+
+
+# ---------------------------------------------------------------- FANZA
+
+def fanza_floor_id(cred: dict) -> str:
+    payload = fetch(f'{FANZA_BASE}/FloorList?' + urllib.parse.urlencode(
+        dict(cred, output='json'))).get('result', {})
 
     for site in payload.get('site') or []:
         if site.get('code') != 'FANZA':
@@ -101,15 +120,13 @@ def videoa_floor_id(credentials: dict) -> str:
     raise SystemExit('FloorList に FANZA/digital/videoa が見つかりませんでした。')
 
 
-def genre_ids(credentials: dict, floor_id: str) -> dict:
-    """ジャンル名 → ジャンルID の対応表を GenreSearch から作る。"""
+def fanza_genres(cred: dict, floor_id: str) -> dict:
     table = {}
     offset = 1
 
     while True:
-        payload = call('GenreSearch', dict(
-            credentials, output='json', floor_id=floor_id,
-            hits=500, offset=offset,
+        payload = fetch(f'{FANZA_BASE}/GenreSearch?' + urllib.parse.urlencode(
+            dict(cred, output='json', floor_id=floor_id, hits=500, offset=offset)
         )).get('result', {})
 
         rows = payload.get('genre') or []
@@ -118,73 +135,213 @@ def genre_ids(credentials: dict, floor_id: str) -> dict:
 
         for row in rows:
             name = (row.get('name') or '').strip()
-            if name and name not in table:
-                table[name] = str(row.get('genre_id'))
+            if name:
+                table.setdefault(normalise(name), str(row.get('genre_id')))
 
         offset += 500
         if offset > int(payload.get('total_count') or 0):
             break
-
-        time.sleep(INTERVAL)
+        time.sleep(0.5)
 
     return table
 
 
-def count_performers(credentials: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int]:
-    counts = Counter()
-    readings = {}
-    ids = {}
-    seen = set()
-    offset = 1
-    total = None
+def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int]:
+    counts, readings, ids, seen = Counter(), {}, {}, set()
+    offset, total = 1, None
 
     while True:
-        payload = call('ItemList', dict(
-            credentials, output='json', site='FANZA', service='digital',
-            floor='videoa', article='genre', article_id=genre_id,
-            hits=HITS, offset=offset, sort='rank',
-        )).get('result', {})
+        payload = fetch(f'{FANZA_BASE}/ItemList?' + urllib.parse.urlencode(dict(
+            cred, output='json', site='FANZA', service='digital', floor='videoa',
+            article='genre', article_id=genre_id, hits=100, offset=offset, sort='rank'
+        ))).get('result', {})
 
         items = payload.get('items') or []
-
         if total is None:
             total = int(payload.get('total_count') or 0)
-
         if not items:
             break
 
         for item in items:
-            content_id = item.get('content_id')
-            if content_id in seen:
+            key = item.get('content_id')
+            if key in seen:
                 continue
-            seen.add(content_id)
-
-            for actress in (item.get('iteminfo') or {}).get('actress') or []:
-                name = (actress.get('name') or '').strip()
+            seen.add(key)
+            for person in (item.get('iteminfo') or {}).get('actress') or []:
+                name = (person.get('name') or '').strip()
                 if not name:
                     continue
                 counts[name] += 1
-                if actress.get('ruby'):
-                    readings.setdefault(name, actress['ruby'])
-                if actress.get('id'):
-                    ids.setdefault(name, str(actress['id']))
+                if person.get('ruby'):
+                    readings.setdefault(name, person['ruby'])
+                if person.get('id'):
+                    ids.setdefault(name, str(person['id']))
 
-        offset += HITS
-
-        if offset > min(total or 0, MAX_OFFSET):
+        offset += 100
+        if offset > min(total or 0, FANZA_MAX_OFFSET):
             break
-
-        time.sleep(INTERVAL)
+        time.sleep(0.5)
 
     return counts, readings, ids, total or 0, len(seen)
+
+
+# ---------------------------------------------------------------- DUGA
+
+def duga_categories(cred: dict) -> dict:
+    """カテゴリ一覧のAPIが無いので、作品を広く見て名前→ID を作る。"""
+    table = {}
+    offset = 1
+
+    while offset <= DUGA_CATEGORY_SCAN:
+        payload = fetch(f'{DUGA_API}?' + urllib.parse.urlencode(dict(
+            cred, version='1.2', bannerid='01', format='json',
+            hits=100, offset=offset, sort='favorite')))
+
+        items = payload.get('items') or []
+        if not items:
+            break
+
+        for wrapper in items:
+            for category in (wrapper.get('item', {}).get('category') or []):
+                data = category.get('data')
+                rows = data if isinstance(data, list) else [data]
+                for row in rows:
+                    if isinstance(row, dict) and row.get('name'):
+                        table.setdefault(normalise(row['name']), str(row.get('id')))
+
+        offset += 100
+        time.sleep(1.2)
+
+    return table
+
+
+def duga_count(cred: dict, category_id: str) -> tuple[Counter, int, int]:
+    counts, seen = Counter(), set()
+    offset, total = 1, None
+
+    while True:
+        payload = fetch(f'{DUGA_API}?' + urllib.parse.urlencode(dict(
+            cred, version='1.2', bannerid='01', format='json',
+            hits=100, offset=offset, category=category_id, sort='favorite')))
+
+        items = payload.get('items') or []
+        if total is None:
+            total = int(payload.get('count') or 0)
+        if not items:
+            break
+
+        for wrapper in items:
+            item = wrapper.get('item', {})
+            key = item.get('productid')
+            if key in seen:
+                continue
+            seen.add(key)
+            for performer in (item.get('performer') or []):
+                data = performer.get('data')
+                rows = data if isinstance(data, list) else [data]
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    name = (row.get('name') or '').strip()
+                    if name:
+                        counts[name] += 1
+
+        offset += 100
+        if offset > min(total or 0, SCAN_LIMIT):
+            break
+        time.sleep(1.2)
+
+    return counts, total or 0, len(seen)
+
+
+# ---------------------------------------------------------------- ソクミル
+
+def sokmil_genres(cred: dict) -> dict:
+    table = {}
+    offset = 1
+
+    while True:
+        payload = fetch(f'{SOKMIL_BASE}/Genre?' + urllib.parse.urlencode(
+            dict(cred, output='json', hits=100, offset=offset)), wait=20).get('result', {})
+
+        rows = payload.get('genres') or []
+        if not rows:
+            break
+
+        for row in rows:
+            name = (row.get('name') or '').strip()
+            if name:
+                table.setdefault(normalise(name), str(row.get('id')))
+
+        total = int(payload.get('total_count') or 0)
+        offset += 100
+        if offset > total:
+            break
+        time.sleep(1.5)
+
+    return table
+
+
+def sokmil_count(cred: dict, genre_id: str) -> tuple[Counter, dict, int, int]:
+    counts, readings, seen = Counter(), {}, set()
+    offset, total = 1, None
+
+    while True:
+        payload = fetch(f'{SOKMIL_BASE}/Item?' + urllib.parse.urlencode(dict(
+            cred, output='json', hits=100, offset=offset,
+            article='genre', article_id=genre_id)), wait=20).get('result', {})
+
+        items = payload.get('items') or []
+        if total is None:
+            total = int(payload.get('total_count') or 0)
+        if not items:
+            break
+
+        for item in items:
+            key = item.get('id')
+            if key in seen:
+                continue
+            seen.add(key)
+            for person in (item.get('iteminfo') or {}).get('actor') or []:
+                name = (person.get('name') or '').strip()
+                if not name:
+                    continue
+                counts[name] += 1
+                if person.get('ruby'):
+                    readings.setdefault(name, person['ruby'])
+
+        offset += 100
+        if offset > min(total or 0, SCAN_LIMIT):
+            break
+        time.sleep(1.5)
+
+    return counts, readings, total or 0, len(seen)
+
+
+# ---------------------------------------------------------------- 本体
+
+def look_up(table: dict, genre: dict, key: str) -> str:
+    """その社での呼び方を、実在する名前の中から選ぶ。無ければ空。"""
+    for candidate in [genre['name']] + list(genre.get(key) or []):
+        found = table.get(normalise(candidate))
+        if found:
+            return found
+    return ''
 
 
 def write(output: Path, result: list) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps({
         'confirmedOn': date.today().isoformat(),
-        'sourceLabel': 'FANZA アフィリエイト Web サービス（動画）',
-        'sourceUrl': 'https://affiliate.dmm.com/api/',
+        'sources': [
+            {'key': 'fanza', 'label': 'FANZA アフィリエイト Web サービス（動画）',
+             'url': 'https://affiliate.dmm.com/api/'},
+            {'key': 'duga', 'label': 'DUGA アフィリエイト Web サービス',
+             'url': 'https://affiliate.duga.jp/'},
+            {'key': 'sokmil', 'label': 'ソクミルアフィリエイト WEBサービス',
+             'url': 'https://sokmil-ad.com/'},
+        ],
+        'scanLimit': SCAN_LIMIT,
         'genres': result,
     }, ensure_ascii=False), encoding='utf-8')
 
@@ -192,20 +349,34 @@ def write(output: Path, result: list) -> None:
 def main() -> None:
     output = Path(sys.argv[1])
 
-    api_id = os.environ.get('FANZA_API_ID')
-    affiliate_id = os.environ.get('FANZA_AFFILIATE_ID')
+    fanza = {'api_id': os.environ.get('FANZA_API_ID'),
+             'affiliate_id': os.environ.get('FANZA_AFFILIATE_ID')}
+    duga = {'appid': os.environ.get('DUGA_APP_ID'),
+            'agentid': os.environ.get('DUGA_AGENT_ID')}
+    sokmil = {'api_key': os.environ.get('SOKMIL_API_KEY'),
+              'affiliate_id': os.environ.get('SOKMIL_AFFILIATE_ID')}
 
-    if not api_id or not affiliate_id:
+    if not all(fanza.values()):
         raise SystemExit('環境変数 FANZA_API_ID と FANZA_AFFILIATE_ID が必要です。')
 
-    credentials = {'api_id': api_id, 'affiliate_id': affiliate_id}
+    floor_id = fanza_floor_id(fanza)
+    fanza_table = fanza_genres(fanza, floor_id)
+    print(f'FANZA のジャンル: {len(fanza_table):,}件（フロアID {floor_id}）', flush=True)
 
-    floor_id = videoa_floor_id(credentials)
-    table = genre_ids(credentials, floor_id)
-    print(f'ジャンルの一覧を取りました: {len(table):,}件（フロアID {floor_id}）', flush=True)
+    duga_table = {}
+    if all(duga.values()):
+        duga_table = duga_categories(duga)
+        print(f'DUGA のカテゴリ: {len(duga_table):,}件', flush=True)
+    else:
+        print('DUGA の認証情報が無いので、DUGA は数えません。', file=sys.stderr)
 
-    # ONLY が指定されていれば、その slug だけを取り直す。
-    # 残りは前回の結果をそのまま引き継ぐ。
+    sokmil_table = {}
+    if all(sokmil.values()):
+        sokmil_table = sokmil_genres(sokmil)
+        print(f'ソクミルのジャンル: {len(sokmil_table):,}件', flush=True)
+    else:
+        print('ソクミルの認証情報が無いので、ソクミルは数えません。', file=sys.stderr)
+
     only = {s.strip() for s in (os.environ.get('ONLY') or '').split(',') if s.strip()}
     previous = {}
 
@@ -226,37 +397,75 @@ def main() -> None:
                 result.append(previous[genre['slug']])
             continue
 
-        genre_id = table.get(genre['name'])
+        print(f"{genre['name']}:", flush=True)
 
-        if not genre_id:
-            print(f"  {genre['name']}: FANZA のジャンル一覧に無いので飛ばします", flush=True)
+        merged = Counter()
+        per_source = {}
+        readings, dmm_ids = {}, {}
+        works, scanned = {}, {}
+
+        fanza_id = look_up(fanza_table, genre, 'fanza')
+        if fanza_id:
+            counts, reads, ids, total, seen = fanza_count(fanza, fanza_id)
+            per_source['fanza'] = counts
+            readings.update(reads)
+            dmm_ids.update(ids)
+            works['fanza'], scanned['fanza'] = total, seen
+            merged.update(counts)
+            print(f'    FANZA  : 作品{total:,}件（{seen:,}件を確認）→ 出演者 {len(counts):,}人', flush=True)
+        else:
+            print('    FANZA  : ジャンル一覧に無いので飛ばします', flush=True)
+
+        duga_id = look_up(duga_table, genre, 'duga') if duga_table else ''
+        if duga_id:
+            counts, total, seen = duga_count(duga, duga_id)
+            per_source['duga'] = counts
+            works['duga'], scanned['duga'] = total, seen
+            merged.update(counts)
+            print(f'    DUGA   : 作品{total:,}件（{seen:,}件を確認）→ 出演者 {len(counts):,}人', flush=True)
+        elif duga_table:
+            print('    DUGA   : カテゴリに無いので飛ばします', flush=True)
+
+        sokmil_id = look_up(sokmil_table, genre, 'sokmil') if sokmil_table else ''
+        if sokmil_id:
+            counts, reads, total, seen = sokmil_count(sokmil, sokmil_id)
+            per_source['sokmil'] = counts
+            for name, ruby in reads.items():
+                readings.setdefault(name, ruby)
+            works['sokmil'], scanned['sokmil'] = total, seen
+            merged.update(counts)
+            print(f'    ソクミル: 作品{total:,}件（{seen:,}件を確認）→ 出演者 {len(counts):,}人', flush=True)
+        elif sokmil_table:
+            print('    ソクミル: ジャンルに無いので飛ばします', flush=True)
+
+        if not merged:
+            print('    どの社にも無かったので、このジャンルは作りません', flush=True)
             continue
 
-        counts, readings, ids, total, scanned = count_performers(credentials, genre_id)
-
-        people = [
-            {'name': name, 'works': count,
-             'reading': readings.get(name, ''), 'dmmId': ids.get(name, '')}
-            for name, count in counts.most_common()
-        ]
+        people = []
+        for name, count in merged.most_common():
+            row = {'name': name, 'works': count,
+                   'reading': readings.get(name, ''), 'dmmId': dmm_ids.get(name, '')}
+            for key in ('fanza', 'duga', 'sokmil'):
+                n = per_source.get(key, {}).get(name, 0)
+                if n:
+                    row[key] = n
+            people.append(row)
 
         result.append({
-            'id': int(genre_id),
             'name': genre['name'],
             'slug': genre['slug'],
-            'works': total,
-            'scanned': scanned,
+            'works': sum(works.values()),
+            'worksBySource': works,
+            'scannedBySource': scanned,
             'performers': people,
         })
 
-        print(f"  {genre['name']}: 作品{total:,}件 → 出演者 {len(people):,}人"
-              f"（{scanned:,}作品を確認）", flush=True)
+        print(f"    合計   : 作品{sum(works.values()):,}件 → 出演者 {len(people):,}人", flush=True)
 
-        # ジャンルごとに書き出す。途中で止まっても、取れたぶんは残る。
-        write(output, result)
+        write(output, result)   # ジャンルごとに書き出す。途中で止まっても残る。
 
     write(output, result)
-
     print()
     print(f'{len(result)}ジャンルを書き出しました → {output}')
 

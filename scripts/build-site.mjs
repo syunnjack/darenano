@@ -475,7 +475,13 @@ function renderGenrePage(genre, rows, confirmedOn) {
       </li>`)
     .join('')
 
-  const description = `FANZA が「${genre.name}」に分類している作品${genre.works.toLocaleString('ja-JP')}件から、`
+  const bySource = genre.worksBySource ?? {}
+  const sourceNames = { fanza: 'FANZA', duga: 'DUGA', sokmil: 'ソクミル' }
+  const used = Object.keys(sourceNames).filter((k) => bySource[k])
+  const breakdown = used.map((k) => `${sourceNames[k]} ${bySource[k].toLocaleString('ja-JP')}件`).join('・')
+
+  const description = `${used.map((k) => sourceNames[k]).join('・')} が「${genre.name}」に分類している`
+    + `作品${genre.works.toLocaleString('ja-JP')}件から、`
     + `出演本数の多い方${rows.length.toLocaleString('ja-JP')}人を並べています。`
 
   return shell({
@@ -487,9 +493,11 @@ function renderGenrePage(genre, rows, confirmedOn) {
       <h1>${escapeHtml(genre.name)}の作品に多く出ている方</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <p class="confirmed">
-        FANZA が作品に付けているジャンルをそのまま数えたものです。
-        題名や紹介文からの推測は含みません。出演本数はFANZAの動画に限った数で、
-        他社で配信された作品は含みません。
+        各社が作品に付けているジャンルを、そのまま数えたものです。
+        題名や紹介文からの推測は含みません。内訳は ${escapeHtml(breakdown)}。
+        同じ人が複数の社に出ている場合は合算しています。
+        DUGA とソクミルは人気順の上位までを数えているため、
+        実際の出演本数より少なく出ることがあります。
       </p>
       <ol class="rank-list">${list}</ol>`,
   })
@@ -505,7 +513,7 @@ function renderGenreIndexPage(genres, confirmedOn) {
       </li>`)
     .join('')
 
-  const description = `FANZA が作品に付けているジャンルのうち${genres.length}件について、`
+  const description = `FANZA・DUGA・ソクミルが作品に付けているジャンルのうち${genres.length}件について、`
     + '出演本数の多い方を並べたページの一覧です。'
 
   return shell({
@@ -517,8 +525,10 @@ function renderGenreIndexPage(genres, confirmedOn) {
       <h1>ジャンル別</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <p class="confirmed">
-        ジャンルの名前と分類は FANZA の表記をそのまま使っています。
+        ジャンルの名前と分類は各社の表記をそのまま使っています。
         当サイトが独自に付け直したものはありません。
+        社によって呼び方が違う場合（制服／制服女子など）は、
+        実在する名前だけを突き合わせています。
       </p>
       <ul class="rank-list">${list}</ul>`,
   })
