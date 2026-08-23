@@ -90,13 +90,15 @@ function App() {
         <p className="site-name">この子だれ？</p>
         <nav>
           <a href="/actress/">五十音索引</a>
+          <a href="/genre/">ジャンル別</a>
+          <a href="/ranking/">投票ランキング</a>
         </nav>
       </header>
 
       <section className="hero">
         <h1>名前から、出演者のプロフィールを引く</h1>
         <p className="lead">
-          FANZA と DUGA が公開している出演者情報を集めた名鑑です。
+          FANZA・DUGA・ソクミルが公開している出演者情報を集めた名鑑です。
           {featured
             ? `${featured.total.toLocaleString('ja-JP')}人を収録し、うち${featured.detailed.toLocaleString('ja-JP')}人はプロフィールを確認できています。`
             : ''}
@@ -203,6 +205,8 @@ function App() {
         <p className="adult">このサイトは18歳未満の方に向けたものではありません。</p>
         <nav aria-label="フッターナビ">
           <a href="/actress/">五十音索引</a>
+          <a href="/genre/">ジャンル別</a>
+          <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
           <a href="mailto:info@darekore.jp">お問い合わせ</a>
         </nav>
@@ -210,6 +214,11 @@ function App() {
           {/* DUGA ウェブサービスの規約で表示が義務づけられているクレジット。
               指定のHTMLをそのまま出す必要があるため、属性を足さない。 */}
           <a href="https://click.duga.jp/aff/api/21786-01" target="_blank">Powered by DUGAウェブサービス</a>
+          {' '}
+          {/* ソクミルも指定のHTMLをそのまま出すことが義務づけられている。 */}
+          <a href="https://sokmil-ad.com/" target="_blank" rel="nofollow">
+            <img src="https://sokmil-ad.com/api/credit/135x18.gif" alt="WEB SERVICE BY SOKMIL" width="135" height="18" border="0" />
+          </a>
         </p>
         <p className="copy">© {new Date().getFullYear()} この子だれ？</p>
       </footer>
