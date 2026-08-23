@@ -59,6 +59,7 @@ function App() {
   const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const [featured, setFeatured] = useState(null)
   const [genres, setGenres] = useState([])
+  const [ranking, setRanking] = useState([])
   const { index, loading, load } = useSearchIndex()
 
   useEffect(() => {
@@ -66,6 +67,27 @@ function App() {
       .then((response) => response.json())
       .then(setFeatured)
       .catch(() => setFeatured(null))
+  }, [])
+
+  // 当サイトの投票によるランキング。上位だけをトップページに出す。
+  useEffect(() => {
+    let cancelled = false
+
+    fetch('/data/ugc-config.json')
+      .then((response) => response.json())
+      .then(({ api, key }) => {
+        if (!api || !key) return []
+        const url = `${api}/rest/v1/performer_stats`
+          + '?select=slug,votes,reviews&order=votes.desc&limit=10'
+        return fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+          .then((response) => (response.ok ? response.json() : []))
+      })
+      .then((rows) => {
+        if (!cancelled) setRanking((rows ?? []).filter((row) => Number(row.votes) > 0))
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -127,6 +149,35 @@ function App() {
         </form>
       </section>
 
+      {!searching && ranking.length > 0 && (
+        <section className="ranking-strip" aria-label="投票ランキング">
+          <div className="ranking-head">
+            <h2>投票ランキング</h2>
+            <a href="/ranking/">すべて見る</a>
+          </div>
+          <p className="ranking-lead">
+            当サイトで押された票の数です。外部の人気度ではありません。
+            出演者のページから投票できます。
+          </p>
+          <ol className="ranking-top">
+            {ranking.slice(0, 5).map((row, position) => (
+              <li key={row.slug}>
+                <span className="ranking-no" aria-hidden="true">{position + 1}</span>
+                <a href={`/actress/${encodeURIComponent(row.slug)}/`}>
+                  {decodeURIComponent(row.slug)}
+                </a>
+                <span className="ranking-count">
+                  {Number(row.votes).toLocaleString('ja-JP')}票
+                  {Number(row.reviews) > 0 && `・口コミ${Number(row.reviews).toLocaleString('ja-JP')}件`}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <div className="layout">
+        <div className="column-main">
       {searching && (
         <section className="results" aria-live="polite">
           <h2>
@@ -175,28 +226,33 @@ function App() {
         </section>
       )}
 
-      {!searching && genres.length > 0 && (
-        <section className="genres">
-          <h2>ジャンルから探す</h2>
-          <p className="genres-lead">
-            FANZA・DUGA・ソクミルが作品に付けているジャンルごとに、
-            出演本数の多い方を並べています。
-          </p>
-          <ul className="genre-chips">
-            {genres.map((genre) => (
-              <li key={genre.slug}>
-                <a href={`/genre/${genre.slug}/`}>
-                  <span className="genre-name">{genre.name}</span>
-                  <span className="genre-count">{genre.people.toLocaleString('ja-JP')}人</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-          <p className="more">
-            <a href="/genre/">ジャンル別の一覧を見る</a>
-          </p>
-        </section>
-      )}
+
+        </div>
+
+        {/* ジャンルの一覧。広い画面では右側に置き、狭い画面では本文の下へ回る。 */}
+        {genres.length > 0 && (
+          <aside className="column-side" aria-label="ジャンルから探す">
+            <h2>ジャンルから探す</h2>
+            <p className="genres-lead">
+              FANZA・DUGA・ソクミルが作品に付けているジャンルごとに、
+              出演本数の多い方を並べています。
+            </p>
+            <ul className="genre-chips">
+              {genres.map((genre) => (
+                <li key={genre.slug}>
+                  <a href={`/genre/${genre.slug}/`}>
+                    <span className="genre-name">{genre.name}</span>
+                    <span className="genre-count">{genre.people.toLocaleString('ja-JP')}人</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="more">
+              <a href="/genre/">ジャンル別の一覧を見る</a>
+            </p>
+          </aside>
+        )}
+      </div>
 
       <section className="about">
         <h2>このサイトについて</h2>

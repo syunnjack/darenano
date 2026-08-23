@@ -1012,6 +1012,16 @@ async function main() {
     .join('\n')
   await writeFile(path.join(publicDir, 'data/search-index.tsv'), `${tsv}\n`, 'utf8')
 
+  // 投票の読み先。トップページ（React）からも読めるように書き出す。
+  // 匿名キーは公開してよい値で、守りはデータベース側の RLS。
+  await writeFile(
+    path.join(publicDir, 'data/ugc-config.json'),
+    JSON.stringify(SUPABASE_URL && SUPABASE_ANON_KEY
+      ? { api: SUPABASE_URL, key: SUPABASE_ANON_KEY }
+      : {}),
+    'utf8'
+  )
+
   // トップページの初期表示。**プロフィールが実際にある人だけ**を並べる。
   // 以前は indexable（画像しか無い人を含む）を使っていたため、
   // 「プロフィールを確認できている」と書きながら名前だけの人が混ざっていた。
