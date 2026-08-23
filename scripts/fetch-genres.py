@@ -74,6 +74,7 @@ GENRES = [
     {'name': 'カーセックス', 'slug': 'car'},
     {'name': 'キャンギャル', 'slug': 'cangal'},
     {'name': 'コンパニオン', 'slug': 'companion'},
+    {'name': 'スチュワーデス', 'slug': 'stewardess'},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
