@@ -23,6 +23,9 @@
 社によって呼び方が違うものがある（制服／制服女子、レズビアン／レズ）。
 その場合は候補を並べ、**実在した名前だけ**を使う。
 
+aka は、世間で通っている別の言い方（スチュワーデス＝CA）。**集計には使わず、
+ページに併記するだけ。** ジャンル名そのものは各社の表記から動かさない。
+
 数える量には上限がある。FANZAは offset 上限の50,000件、DUGAとソクミルは
 時間の都合で人気順の上位から SCAN_LIMIT 件まで。ページにもその旨を出す。
 
@@ -74,7 +77,7 @@ GENRES = [
     {'name': 'カーセックス', 'slug': 'car'},
     {'name': 'キャンギャル', 'slug': 'cangal'},
     {'name': 'コンパニオン', 'slug': 'companion'},
-    {'name': 'スチュワーデス', 'slug': 'stewardess'},
+    {'name': 'スチュワーデス', 'slug': 'stewardess', 'aka': ['CA', 'キャビンアテンダント']},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
@@ -461,14 +464,17 @@ def main() -> None:
                     row[key] = n
             people.append(row)
 
-        result.append({
+        entry = {
             'name': genre['name'],
             'slug': genre['slug'],
             'works': sum(works.values()),
             'worksBySource': works,
             'scannedBySource': scanned,
             'performers': people,
-        })
+        }
+        if genre.get('aka'):
+            entry['aka'] = list(genre['aka'])
+        result.append(entry)
 
         print(f"    合計   : 作品{sum(works.values()):,}件 → 出演者 {len(people):,}人", flush=True)
 

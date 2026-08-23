@@ -480,9 +480,14 @@ function renderGenrePage(genre, rows, confirmedOn) {
   const used = Object.keys(sourceNames).filter((k) => bySource[k])
   const breakdown = used.map((k) => `${sourceNames[k]} ${bySource[k].toLocaleString('ja-JP')}件`).join('・')
 
+  // 世間で通っている別の言い方。集計には関係しない、探すときの手がかり。
+  const aka = genre.aka ?? []
+  const akaText = aka.length ? `${aka.join('・')}とも呼ばれます。` : ''
+
   const description = `${used.map((k) => sourceNames[k]).join('・')} が「${genre.name}」に分類している`
     + `作品${genre.works.toLocaleString('ja-JP')}件から、`
     + `出演本数の多い方${rows.length.toLocaleString('ja-JP')}人を並べています。`
+    + akaText
 
   return shell({
     title: `${genre.name}の作品に多く出ている方${rows.length}人｜${SITE_NAME}`,
@@ -491,6 +496,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
     crumbs: `<a href="/genre/">ジャンル別</a> ＞ ${escapeHtml(genre.name)}`,
     body: `
       <h1>${escapeHtml(genre.name)}の作品に多く出ている方</h1>
+      ${aka.length ? `<p class="aka">${escapeHtml(aka.join('・'))}とも呼ばれます</p>` : ''}
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <p class="confirmed">
         各社が作品に付けているジャンルを、そのまま数えたものです。
@@ -509,6 +515,7 @@ function renderGenreIndexPage(genres, confirmedOn) {
     .map((genre) => `
       <li>
         <a href="/genre/${encodeURIComponent(genre.slug)}/">${escapeHtml(genre.name)}</a>
+        ${(genre.aka ?? []).length ? `<span class="aka">（${escapeHtml(genre.aka.join('・'))}）</span>` : ''}
         <span class="rank-count">作品${genre.works.toLocaleString('ja-JP')}件</span>
       </li>`)
     .join('')
@@ -567,6 +574,7 @@ function shell({ title, description, canonical, crumbs, body }) {
 }
 
 const PAGE_CSS = `:root { color-scheme: light dark; }
+.aka { color: #777; font-size: .85rem; margin: -.4rem 0 .8rem; }
 body { margin:0; font-family:"Hiragino Sans","Yu Gothic",system-ui,sans-serif; color:#1c1a22; background:#fbf8f6; line-height:1.7; }
 .wrap { max-width:760px; margin:0 auto; padding:24px 20px 64px; }
 .crumbs { font-size:13px; color:#7a7484; margin-bottom:18px; }
