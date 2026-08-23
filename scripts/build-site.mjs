@@ -637,6 +637,9 @@ function shell({ title, description, canonical, crumbs, body }) {
 const PAGE_CSS = `:root { color-scheme: light dark; }
 .aka { color: #777; font-size: .85rem; margin: -.4rem 0 .8rem; }
 body { margin:0; font-family:"Hiragino Sans","Yu Gothic",system-ui,sans-serif; color:#1c1a22; background:#fbf8f6; line-height:1.7; }
+/* 切れ目の無い長い語（ローマ字の別名、レーベル名の羅列）が横にはみ出さないように。 */
+body, .profile td, .rank-list a, .name-list a, .chips a { overflow-wrap:anywhere; word-break:normal; }
+img { max-width:100%; height:auto; }
 .wrap { max-width:760px; margin:0 auto; padding:24px 20px 64px; }
 .crumbs { font-size:13px; color:#7a7484; margin-bottom:18px; }
 .crumbs a { color:#8b4054; text-decoration:none; }
@@ -704,6 +707,19 @@ footer a { color:#8b4054; }
 .rank-no { min-width:2.4em; color:#8a838f; font-size:13px; }
 .rank-list a { color:#8b4054; text-decoration:none; }
 .rank-count { font-size:13px; color:#8a838f; margin-left:8px; }
+/* 狭い画面。余白と部品を詰めて、横に溢れないようにする。 */
+@media (max-width:480px) {
+  .wrap { padding:16px 14px 56px; }
+  .kana-nav.big a { min-width:64px; padding:10px 8px; font-size:16px; }
+  .photo { width:100%; }
+  .photo img { width:132px; margin:0 auto; }
+  .rank-list li { flex-wrap:wrap; gap:4px 8px; }
+  .rank-count { margin-left:0; }
+  .site-nav { gap:6px; }
+  .site-nav a { padding:0 12px; font-size:13px; }
+  .vote-box { flex-wrap:wrap; }
+}
+
 @media (prefers-color-scheme: dark) {
   .reviews li, .review-form input, .review-form textarea { background:#211e28; border-color:#332d3d; }
 }

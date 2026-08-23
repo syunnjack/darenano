@@ -42,6 +42,16 @@
   box-sizing: border-box;
 }
 
+/* 切れ目の無い長い語（ローマ字の別名など）で横に溢れないように。 */
+body {
+  overflow-wrap: anywhere;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
 html {
   scroll-behavior: smooth;
 }

@@ -568,3 +568,36 @@
 .card-list.numbered li:nth-child(1) .card-rank { background: var(--accent); color: #fff; }
 .card-list.numbered li:nth-child(2) .card-rank { background: var(--accent-2); color: #fff; }
 .card-list.numbered li:nth-child(3) .card-rank { background: var(--accent-soft); color: var(--accent); }
+
+
+/* 狭い画面。余白と部品を詰める。 */
+@media (max-width: 480px) {
+  .site {
+    padding: 0 14px 56px;
+  }
+
+  .hero {
+    padding: 28px 16px 16px;
+  }
+
+  .card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .ranking-strip {
+    padding: 16px 14px 12px;
+  }
+
+  .ranking-top li {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .ranking-count {
+    margin-left: 38px;
+  }
+
+  .column-side {
+    padding: 14px;
+  }
+}
