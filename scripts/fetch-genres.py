@@ -52,6 +52,7 @@ GENRES = [
     {'name': 'コスプレ', 'slug': 'cosplay'},
     {'name': 'レズビアン', 'slug': 'lesbian'},
     {'name': '巫女', 'slug': 'miko'},
+    {'name': '中出し', 'slug': 'nakadashi'},
     {'name': '巨乳', 'slug': 'kyonyu'},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma'},
