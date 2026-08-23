@@ -206,11 +206,36 @@ function App() {
         </section>
       )}
 
+      {!searching && featured?.mostWorks?.length > 0 && (
+        <section className="results">
+          <h2>出演作品数の多い方</h2>
+          <p className="section-note">
+            DUGA の作品データに記録されている収録作品数の順です。
+            当サイトが人気や評価を判断したものではありません。
+          </p>
+          <ol className="card-list numbered">
+            {featured.mostWorks.map((person, position) => (
+              <li key={person.slug}>
+                <a href={`/actress/${person.slug}/`}>
+                  <span className="card-rank" aria-hidden="true">{position + 1}</span>
+                  <span className="card-name">{person.name}</span>
+                  {person.reading && <span className="card-reading">{person.reading}</span>}
+                  <span className="card-facts">{person.works.toLocaleString('ja-JP')}作品</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+          <p className="more">
+            <a href="/actress/">五十音索引ですべて見る</a>
+          </p>
+        </section>
+      )}
+
       {!searching && featured?.people?.length > 0 && (
         <section className="results">
           <h2>プロフィールを確認できている方</h2>
           <ul className="card-list">
-            {featured.people.filter((person) => person.facts?.length > 0).map((person) => (
+            {featured.people.filter((person) => person.facts?.length > 0).slice(0, 20).map((person) => (
               <li key={person.slug}>
                 <a href={`/actress/${person.slug}/`}>
                   <span className="card-name">{person.name}</span>

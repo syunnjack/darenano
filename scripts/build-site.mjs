@@ -1032,6 +1032,18 @@ async function main() {
       total: people.length,
       indexed: indexable.length,
       detailed: withProfile.length,
+      // 出演作品数の多い方。DUGA の作品データCSVに記録された収録数で並べる。
+      // 「人気」の順位は各社のAPIに無いので作らない。数えたのは DUGA のぶんだけ。
+      mostWorks: targets
+        .filter((p) => (p.duga?.works ?? 0) > 0)
+        .sort((a, b) => (b.duga.works - a.duga.works) || a.name.localeCompare(b.name, 'ja'))
+        .slice(0, 20)
+        .map((p) => ({
+          name: p.name,
+          reading: p.reading,
+          slug: p.slug,
+          works: p.duga.works,
+        })),
       people: withProfile.slice(0, 60).map((p) => ({
         name: p.name,
         reading: p.reading,

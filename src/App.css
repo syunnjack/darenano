@@ -531,3 +531,40 @@
   color: var(--muted);
   white-space: nowrap;
 }
+
+
+/* 出演作品数の多い方 */
+.section-note {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card-list.numbered {
+  list-style: none;
+  counter-reset: none;
+}
+
+.card-list.numbered a {
+  position: relative;
+  padding-left: 46px;
+}
+
+.card-rank {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--rule);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.card-list.numbered li:nth-child(1) .card-rank { background: var(--accent); color: #fff; }
+.card-list.numbered li:nth-child(2) .card-rank { background: var(--accent-2); color: #fff; }
+.card-list.numbered li:nth-child(3) .card-rank { background: var(--accent-soft); color: var(--accent); }
