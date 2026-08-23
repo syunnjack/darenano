@@ -490,7 +490,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
     + akaText
 
   return shell({
-    title: `${genre.name}の作品に多く出ている方${rows.length}人｜${SITE_NAME}`,
+    title: `${genre.name}の作品に多く出ている方${rows.length.toLocaleString('ja-JP')}人｜${SITE_NAME}`,
     description,
     canonical: `${SITE_URL}/genre/${genre.slug}/`,
     crumbs: `<a href="/genre/">ジャンル別</a> ＞ ${escapeHtml(genre.name)}`,
