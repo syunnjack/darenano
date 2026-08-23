@@ -70,6 +70,7 @@ GENRES = [
      'duga': ['寝取られ', '寝取り', 'NTR'], 'sokmil': ['寝取られ', 'NTR']},
     {'name': 'アクメ・オーガズム', 'slug': 'acme', 'sokmil': ['アクメ'], 'duga': ['アクメ']},
     {'name': 'パンチラ', 'slug': 'panchira'},
+    {'name': 'ぽっちゃり', 'slug': 'pocchari'},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
