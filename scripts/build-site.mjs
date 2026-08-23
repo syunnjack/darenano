@@ -379,7 +379,7 @@ function renderRedirect(person) {
 }
 
 /** 五十音索引の入口。頭文字ごとのページへ振り分ける。 */
-function renderIndexPage(groups, total, confirmedOn) {
+function renderIndexPage(groups, total, detailed, confirmedOn) {
   const counts = new Map(groups.map(([head, members]) => [head, members.length]))
 
   const rows = KANA_ROWS.map(([row, initials]) => {
@@ -396,7 +396,8 @@ function renderIndexPage(groups, total, confirmedOn) {
     : ''
 
   const title = `五十音索引｜${SITE_NAME}`
-  const description = `FANZA・DUGA が公開している出演者のうち、プロフィールを確認できた${total.toLocaleString('ja-JP')}人を、読みの頭文字ごとに並べています。`
+  const description = `FANZA・DUGA・ソクミルが公開している出演者${total.toLocaleString('ja-JP')}人を、`
+    + `読みの頭文字ごとに並べています。うち${detailed.toLocaleString('ja-JP')}人は生年月日や身長などのプロフィールを確認できています。`
 
   return shell({
     title,
@@ -896,13 +897,17 @@ async function main() {
 
   // 索引ページには、中身のあるページだけを載せる。
   const indexable = targets.filter((p) => p.indexable)
+
+  // indexable は「ページを作る価値がある人」で、画像しか無い人も含む。
+  // 「プロフィールを確認できた人」として数えてよいのは、項目が1つ以上ある人だけ。
+  const withProfile = indexable.filter((p) => p.profile.length > 0)
   const indexGroups = [...KANA_ROWS.flatMap(([, initials]) => initials.map(([head]) => head)), 'その他']
     .map((head) => [head, (rows.get(head) ?? []).filter((p) => p.indexable)])
     .filter(([, members]) => members.length > 0)
 
   await writeFile(
     path.join(outDir, 'index.html'),
-    renderIndexPage(indexGroups, indexable.length, confirmedOn),
+    renderIndexPage(indexGroups, indexable.length, withProfile.length, confirmedOn),
     'utf8'
   )
 
@@ -981,14 +986,17 @@ async function main() {
     .join('\n')
   await writeFile(path.join(publicDir, 'data/search-index.tsv'), `${tsv}\n`, 'utf8')
 
-  // トップページの初期表示用（プロフィールのある人だけ）。
+  // トップページの初期表示。**プロフィールが実際にある人だけ**を並べる。
+  // 以前は indexable（画像しか無い人を含む）を使っていたため、
+  // 「プロフィールを確認できている」と書きながら名前だけの人が混ざっていた。
   await writeFile(
     path.join(publicDir, 'data/featured.json'),
     JSON.stringify({
       confirmedOn,
       total: people.length,
-      detailed: indexable.length,
-      people: indexable.slice(0, 60).map((p) => ({
+      indexed: indexable.length,
+      detailed: withProfile.length,
+      people: withProfile.slice(0, 60).map((p) => ({
         name: p.name,
         reading: p.reading,
         slug: p.slug,

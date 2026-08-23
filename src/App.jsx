@@ -108,7 +108,7 @@ function App() {
         <p className="lead">
           FANZA・DUGA・ソクミルが公開している出演者情報を集めた名鑑です。
           {featured
-            ? `${featured.total.toLocaleString('ja-JP')}人を収録し、うち${featured.detailed.toLocaleString('ja-JP')}人はプロフィールを確認できています。`
+            ? `${featured.total.toLocaleString('ja-JP')}人を収録し、うち${featured.detailed.toLocaleString('ja-JP')}人は生年月日や身長などのプロフィールを確認できています。`
             : ''}
           名前の一部や読みを入れると、候補を絞り込めます。
         </p>
@@ -159,7 +159,7 @@ function App() {
         <section className="results">
           <h2>プロフィールを確認できている方</h2>
           <ul className="card-list">
-            {featured.people.map((person) => (
+            {featured.people.filter((person) => person.facts?.length > 0).map((person) => (
               <li key={person.slug}>
                 <a href={`/actress/${person.slug}/`}>
                   <span className="card-name">{person.name}</span>
