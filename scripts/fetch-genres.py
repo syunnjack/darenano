@@ -475,6 +475,9 @@ def main() -> None:
         entry = {
             'name': genre['name'],
             'slug': genre['slug'],
+            # 各社のジャンル一覧へリンクするために、引き当てたIDを残す。
+            'ids': {k: v for k, v in
+                    (('fanza', fanza_id), ('duga', duga_id), ('sokmil', sokmil_id)) if v},
             'works': sum(works.values()),
             'worksBySource': works,
             'scannedBySource': scanned,
