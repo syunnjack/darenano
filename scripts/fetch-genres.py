@@ -84,6 +84,7 @@ GENRES = [
      'duga': ['スワッピング'], 'sokmil': ['スワッピング'], 'aka': ['スワッピング', '夫婦交換']},
     {'name': '顔射', 'slug': 'gansha'},
     {'name': '巨尻', 'slug': 'kyojiri', 'aka': ['美尻', 'デカ尻']},
+    {'name': '4K', 'slug': '4k'},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
