@@ -13,26 +13,74 @@
   white-space: nowrap;
 }
 
-/* 見出し帯 */
+/* 見出し帯。狭い画面では名前とナビを縦に積む。 */
 .masthead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 18px 0;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  padding: 16px 0 14px;
   border-bottom: 1px solid var(--rule);
 }
 
 .site-name {
   margin: 0;
-  font-size: 17px;
-  font-weight: 700;
+  font-size: clamp(20px, 4.5vw, 26px);
+  font-weight: 800;
+  letter-spacing: .01em;
+  line-height: 1.2;
+  background: linear-gradient(92deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 主要な行き先。指で押せる大きさ（最低44px）を確保する。 */
+.masthead nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .masthead nav a {
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--accent);
   text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--panel);
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.masthead nav a:hover,
+.masthead nav a:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 560px) {
+  .masthead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .masthead nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .masthead nav a {
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 14px;
+  }
 }
 
 /* 導入 */
@@ -234,8 +282,27 @@
 .site-footer nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.site-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.site-footer nav a:hover,
+.site-footer nav a:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .site-footer a {

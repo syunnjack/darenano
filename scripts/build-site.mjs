@@ -330,6 +330,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
   </head>
   <body>
     <div class="wrap">
+      <header class="site-head"><a class="site-name" href="/">${escapeHtml(SITE_NAME)}</a></header>
       <nav class="crumbs"><a href="/">${escapeHtml(SITE_NAME)}</a> ＞ <a href="/actress/">五十音索引</a></nav>
       <h1>${escapeHtml(person.name)}</h1>
       ${person.reading ? `<p class="reading">読み: ${escapeHtml(person.reading)}</p>` : ''}
@@ -349,7 +350,13 @@ function renderPage(person, { profile, sources, related, indexable }) {
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/genre/">ジャンル別</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <nav class="site-nav">
+          <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
+          <a href="/actress/">五十音索引</a>
+          <a href="/genre/">ジャンル別</a>
+          <a href="/ranking/">投票ランキング</a>
+          <a href="/privacy/">プライバシーポリシー</a>
+        </nav>
         <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
@@ -606,12 +613,19 @@ function shell({ title, description, canonical, crumbs, body }) {
   </head>
   <body>
     <div class="wrap">
+      <header class="site-head"><a class="site-name" href="/">${escapeHtml(SITE_NAME)}</a></header>
       <nav class="crumbs"><a href="/">${escapeHtml(SITE_NAME)}</a> ＞ ${crumbs}</nav>
       ${body}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
-        <p><a href="/">${escapeHtml(SITE_NAME)} トップ</a> ・ <a href="/actress/">五十音索引</a> ・ <a href="/genre/">ジャンル別</a> ・ <a href="/ranking/">投票ランキング</a> ・ <a href="/privacy/">プライバシーポリシー</a></p>
+        <nav class="site-nav">
+          <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
+          <a href="/actress/">五十音索引</a>
+          <a href="/genre/">ジャンル別</a>
+          <a href="/ranking/">投票ランキング</a>
+          <a href="/privacy/">プライバシーポリシー</a>
+        </nav>
         <p class="credit">${DUGA_CREDIT} ${SOKMIL_CREDIT}</p>
       </footer>
     </div>
@@ -662,6 +676,14 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .name-list a:hover { color:#8b4054; text-decoration:underline; }
 footer { margin-top:44px; border-top:1px solid #ecdfe2; padding-top:16px; font-size:13px; color:#7a7484; }
 footer a { color:#8b4054; }
+/* 主要な行き先。指で押せる大きさ（40px以上）を確保する。 */
+.site-nav { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 12px; }
+.site-nav a { display:inline-flex; align-items:center; min-height:40px; padding:0 14px; font-size:14px; font-weight:600; text-decoration:none; border:1px solid #ecdfe2; border-radius:999px; background:#fff; }
+.site-nav a:hover, .site-nav a:focus-visible { border-color:#8b4054; background:#f3e6ea; }
+.crumbs { font-size:14px; }
+/* どのページからでもトップへ戻れるように、上に名前を出す。 */
+.site-head { padding:14px 0 12px; border-bottom:1px solid #ecdfe2; margin-bottom:16px; }
+.site-head .site-name { font-size:clamp(19px,4vw,24px); font-weight:800; text-decoration:none; background:linear-gradient(92deg,#8b4054,#3f5d75); -webkit-background-clip:text; background-clip:text; color:transparent; }
 .credit { margin-top:10px; }
 .ugc { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .vote-box { display:flex; align-items:center; gap:12px; margin:12px 0 4px; }
@@ -693,6 +715,10 @@ footer a { color:#8b4054; }
   .profile th, .profile td, .profile, .thin, .chips a, .kana-nav a { border-color:#332d3d; }
   .name-list a { color:#ded8e6; }
   .crumbs a, .sources a, .chips a, .kana-nav a, footer a, .name-list a:hover { color:#f0908a; }
+  .site-head { border-color:#332d3d; }
+  .site-head .site-name { background:linear-gradient(92deg,#f0908a,#8fb4d0); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .site-nav a { border-color:#332d3d; background:#211e28; color:#f0908a; }
+  .site-nav a:hover, .site-nav a:focus-visible { border-color:#f0908a; background:#3a2932; }
 }
 `
 
