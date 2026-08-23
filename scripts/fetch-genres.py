@@ -66,6 +66,8 @@ GENRES = [
     {'name': 'レズビアン', 'slug': 'lesbian', 'duga': ['レズ'], 'sokmil': ['レズ']},
     {'name': '巫女', 'slug': 'miko'},
     {'name': '中出し', 'slug': 'nakadashi'},
+    {'name': '寝取り・寝取られ・NTR', 'slug': 'netorare',
+     'duga': ['寝取られ', '寝取り', 'NTR'], 'sokmil': ['寝取られ', 'NTR']},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
