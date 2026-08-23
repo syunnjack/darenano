@@ -49,6 +49,8 @@ GENRES = [
     {'name': '騎乗位', 'slug': 'kijoi'},
     {'name': '素人', 'slug': 'shirouto'},
     {'name': 'ハメ撮り', 'slug': 'hamedori'},
+    {'name': 'コスプレ', 'slug': 'cosplay'},
+    {'name': 'レズビアン', 'slug': 'lesbian'},
     {'name': '巨乳', 'slug': 'kyonyu'},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma'},
