@@ -80,6 +80,8 @@ GENRES = [
     {'name': 'スチュワーデス', 'slug': 'stewardess', 'aka': ['CA', 'キャビンアテンダント']},
     {'name': '野外・露出', 'slug': 'roshutsu',
      'duga': ['露出'], 'sokmil': ['露出', '野外露出'], 'aka': ['露出']},
+    {'name': 'スワッピング・夫婦交換', 'slug': 'swapping',
+     'duga': ['スワッピング'], 'sokmil': ['スワッピング'], 'aka': ['スワッピング', '夫婦交換']},
     {'name': '巨乳', 'slug': 'kyonyu', 'duga': ['おっぱい']},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma', 'duga': ['人妻'], 'sokmil': ['人妻']},
