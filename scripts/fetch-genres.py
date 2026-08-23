@@ -46,6 +46,7 @@ MAX_OFFSET = 50000
 # 引き当てられなくなる。slug は URL 用のローマ字。
 GENRES = [
     {'name': 'バック', 'slug': 'back'},
+    {'name': '騎乗位', 'slug': 'kijoi'},
     {'name': '巨乳', 'slug': 'kyonyu'},
     {'name': '美少女', 'slug': 'bishojo'},
     {'name': '人妻・主婦', 'slug': 'hitozuma'},
