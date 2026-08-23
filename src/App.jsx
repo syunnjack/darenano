@@ -231,25 +231,6 @@ function App() {
         </section>
       )}
 
-      {!searching && featured?.people?.length > 0 && (
-        <section className="results">
-          <h2>プロフィールを確認できている方</h2>
-          <ul className="card-list">
-            {featured.people.filter((person) => person.facts?.length > 0).slice(0, 20).map((person) => (
-              <li key={person.slug}>
-                <a href={`/actress/${person.slug}/`}>
-                  <span className="card-name">{person.name}</span>
-                  {person.reading && <span className="card-reading">{person.reading}</span>}
-                  {person.facts.length > 0 && <span className="card-facts">{person.facts.join('・')}</span>}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <p className="more">
-            <a href="/actress/">五十音索引ですべて見る</a>
-          </p>
-        </section>
-      )}
 
 
         </div>

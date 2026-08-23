@@ -1037,19 +1037,14 @@ async function main() {
       mostWorks: targets
         .filter((p) => (p.duga?.works ?? 0) > 0)
         .sort((a, b) => (b.duga.works - a.duga.works) || a.name.localeCompare(b.name, 'ja'))
-        .slice(0, 20)
+        // 右のジャンル一覧（34件）と縦の長さが釣り合うくらいに出す。
+        .slice(0, 50)
         .map((p) => ({
           name: p.name,
           reading: p.reading,
           slug: p.slug,
           works: p.duga.works,
         })),
-      people: withProfile.slice(0, 60).map((p) => ({
-        name: p.name,
-        reading: p.reading,
-        slug: p.slug,
-        facts: p.profile.map(([label, value]) => `${label}: ${value}`),
-      })),
     }),
     'utf8'
   )
