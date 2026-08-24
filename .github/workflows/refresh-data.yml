@@ -19,6 +19,10 @@ on:
         description: '取り直すジャンルの slug（カンマ区切り。空なら全部）'
         type: string
         required: false
+      links_only:
+        description: '集計はせず、各社への行き先だけを足す'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -79,6 +83,7 @@ jobs:
           SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}
           SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
           ONLY: ${{ inputs.genres_only }}
+          LINKS_ONLY: ${{ inputs.links_only && '1' || '' }}
         run: python scripts/fetch-genres.py public/data/genres.json
         continue-on-error: true
 

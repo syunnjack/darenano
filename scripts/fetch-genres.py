@@ -347,6 +347,28 @@ def sokmil_count(cred: dict, genre_id: str) -> tuple[Counter, dict, int, int]:
     return counts, readings, total or 0, len(seen)
 
 
+# ------------------------------------------------- 行き先だけを取る（1ページ）
+
+def fanza_top_url(cred: dict, genre_id: str) -> str:
+    """人気順1位の作品のアフィリエイトURL。1ページ読むだけで済む。"""
+    payload = fetch(f'{FANZA_BASE}/ItemList?' + urllib.parse.urlencode(dict(
+        cred, output='json', site='FANZA', service='digital', floor='videoa',
+        article='genre', article_id=genre_id, hits=1, offset=1, sort='rank'
+    ))).get('result', {})
+    items = payload.get('items') or []
+    return (items[0].get('affiliateURL') or '') if items else ''
+
+
+def duga_top_url(cred: dict, category_id: str) -> str:
+    payload = fetch(f'{DUGA_API}?' + urllib.parse.urlencode(dict(
+        cred, version='1.2', bannerid='01', format='json',
+        hits=1, offset=1, category=category_id, sort='favorite')))
+    items = payload.get('items') or []
+    if not items:
+        return ''
+    return items[0].get('item', {}).get('affiliateurl') or ''
+
+
 # ---------------------------------------------------------------- 本体
 
 def look_up(table: dict, genre: dict, key: str) -> str:
@@ -407,9 +429,14 @@ def main() -> None:
         print('ソクミルの認証情報が無いので、ソクミルは数えません。', file=sys.stderr)
 
     only = {s.strip() for s in (os.environ.get('ONLY') or '').split(',') if s.strip()}
+
+    # LINKS_ONLY=1 のときは、集計をやり直さず**各社への行き先だけ**を足す。
+    # 出演者を数え直すのに1ジャンル10分かかるが、リンクに要るのは
+    # 人気順1位の作品のURLだけなので、1ページ読めば済む。
+    links_only = os.environ.get('LINKS_ONLY') == '1'
     previous = {}
 
-    if only and output.exists():
+    if (only or links_only) and output.exists():
         try:
             for row in json.loads(output.read_text(encoding='utf-8')).get('genres', []):
                 previous[row['slug']] = row
@@ -419,6 +446,50 @@ def main() -> None:
             only = set()
 
     result = []
+
+    if links_only:
+        if not previous:
+            raise SystemExit('LINKS_ONLY には前回の結果が必要です。')
+
+        for genre in GENRES:
+            row = previous.get(genre['slug'])
+            if not row:
+                continue
+
+            if row.get('links'):
+                result.append(row)
+                continue
+
+            links = {}
+
+            fanza_id = look_up(fanza_table, genre, 'fanza')
+            if fanza_id:
+                url = fanza_top_url(fanza, fanza_id)
+                if url:
+                    links['fanza'] = url
+
+            duga_id = look_up(duga_table, genre, 'duga') if duga_table else ''
+            if duga_id:
+                url = duga_top_url(duga, duga_id)
+                if url:
+                    links['duga'] = url
+
+            sokmil_id = look_up(sokmil_table, genre, 'sokmil') if sokmil_table else ''
+            if sokmil_id and sokmil_urls.get(sokmil_id):
+                links['sokmil'] = sokmil_urls[sokmil_id]
+
+            if links:
+                row['links'] = links
+
+            result.append(row)
+            print(f"{genre['name']}: 行き先 {len(links)}件", flush=True)
+            write(output, result)
+            time.sleep(1.2)
+
+        write(output, result)
+        print()
+        print(f'{len(result)}ジャンルに行き先を足しました → {output}')
+        return
 
     for genre in GENRES:
         if only and genre['slug'] not in only:
