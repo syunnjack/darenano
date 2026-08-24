@@ -110,6 +110,10 @@ jobs:
     needs: refresh
     if: needs.refresh.outputs.changed == 'true'
     uses: ./.github/workflows/deploy.yml
+    # **これが無いと Secret が渡らない。** 再利用ワークフローは呼び出し元の
+    # Secret を自動では受け取らないため、SUPABASE_URL などが空になり、
+    # 投票と口コミの欄が消えたページが配信されてしまう。
+    secrets: inherit
     permissions:
       contents: read
       pages: write
