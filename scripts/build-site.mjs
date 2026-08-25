@@ -563,7 +563,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
     .join('')
 
   const bySource = genre.worksBySource ?? {}
-  const sourceNames = { fanza: 'FANZA', duga: 'DUGA', sokmil: 'ソクミル' }
+  const sourceNames = { fanza: 'FANZA', duga: 'DUGA', sokmil: 'ソクミル', b10f: 'B10F' }
   const used = Object.keys(sourceNames).filter((k) => bySource[k])
   const breakdown = used.map((k) => `${sourceNames[k]} ${bySource[k].toLocaleString('ja-JP')}件`).join('・')
 
@@ -573,10 +573,13 @@ function renderGenrePage(genre, rows, confirmedOn) {
 
   // 各社への行き先。fetch-genres.py が **APIから受け取ったURLだけ** を持っている。
   // FANZAとDUGAはジャンル一覧のURLを返さないため、人気順1位の作品へ送る。
+  // B10F はタグのページのURLがCSVに入っている。表記が違うので、向こうの名前で書く。
+  const b10fTag = genre.b10fTags?.[0] ?? genre.name
   const shopLabels = {
     fanza: `FANZA で「${genre.name}」の人気1位の作品を見る`,
     duga: `DUGA で「${genre.name}」の人気1位の作品を見る`,
     sokmil: `ソクミル で「${genre.name}」の作品一覧を見る`,
+    b10f: `B10F で「${b10fTag}」の作品一覧を見る`,
   }
   const shops = Object.entries(genre.links ?? {}).filter(([key, url]) => url && shopLabels[key])
   const shopsHtml = shops.length
@@ -605,6 +608,10 @@ function renderGenrePage(genre, rows, confirmedOn) {
         同じ人が複数の社に出ている場合は合算しています。
         DUGA とソクミルは人気順の上位までを数えているため、
         実際の出演本数より少なく出ることがあります。
+        ${bySource.b10f
+          ? 'B10F は全作品から数えていますが、出演者名が入っている作品が'
+            + '全体の6%ほどしかないため、こちらも少なく出ます。'
+          : ''}
       </p>
       ${shopsHtml}
       <ol class="rank-list">${list}</ol>
@@ -1098,7 +1105,48 @@ async function main() {
     console.log('ジャンルのデータが無いので、ジャンル別ページは作りません。')
   }
 
+  // B10F のタグ別集計を足す。名前が重なるジャンルだけ（fetch-b10f-csv.py の GENRE_TAGS）。
   if (genreList.length) {
+    try {
+      const file = await readJson(path.join(publicDir, 'data/b10f-genres.json'))
+      const bySlug = new Map((file.genres ?? []).map((g) => [g.slug, g]))
+      let merged = 0
+
+      for (const genre of genreList) {
+        const found = bySlug.get(genre.slug)
+        if (!found) continue
+
+        genre.worksBySource = { ...(genre.worksBySource ?? {}), b10f: found.works }
+        genre.works = (genre.works ?? 0) + found.works
+        genre.links = { ...(genre.links ?? {}), b10f: found.link }
+        genre.b10fTags = found.b10fTags
+
+        const byName = new Map(genre.performers.map((row) => [normaliseName(row.name), row]))
+
+        for (const row of found.performers) {
+          const key = normaliseName(row.name)
+          const exist = byName.get(key)
+
+          if (exist) {
+            exist.works += row.works
+            exist.b10f = row.works
+            continue
+          }
+
+          const record = { name: row.name, works: row.works, b10f: row.works }
+          genre.performers.push(record)
+          byName.set(key, record)
+        }
+
+        genre.performers.sort((a, b) => b.works - a.works || a.name.localeCompare(b.name, 'ja'))
+        merged += 1
+      }
+
+      console.log(`B10F: ${merged}ジャンルに足しました。`)
+    } catch {
+      console.log('B10F のジャンル別データが無いので、そのぶんは足しません。')
+    }
+
     const slugOf = new Map(targets.map((p) => [normaliseName(p.name), p.slug]))
     await rm(path.join(publicDir, 'genre'), { recursive: true, force: true })
 
