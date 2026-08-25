@@ -156,6 +156,11 @@ function profileOf(person) {
     entries.push(['主なレーベル', person.duga.labels.join('、')])
   }
 
+  // B10F。カテゴリーごとのCSVしか無いので、置いてあるCSVのぶんだけの数になる。
+  // 全作品を数えたものではないため、そう分かる書き方にしてある。
+  const b10fSpan = b10fSpanOf(person.b10f)
+  if (b10fSpan) entries.push(['B10Fでの収録', b10fSpan])
+
   return entries
 }
 
@@ -174,6 +179,35 @@ function duraSpan(duga) {
   const works = `${duga.works.toLocaleString('ja-JP')}作品`
 
   return first === last ? `${first}（${works}）` : `${first} 〜 ${last}（${works}）`
+}
+
+/**
+ * 数えたカテゴリーの書き方。数が多いときは名前を並べない。
+ *
+ * B10F のカテゴリーには露骨な語を含むものがある（「近親相姦」など130種）。
+ * 出演者のプロフィール欄に全部を並べると、その人の作品の内容だと読めてしまう。
+ * 5つを超えたら本数だけにする。
+ */
+function categoryLabel(categories) {
+  if (!categories?.length) return '一部カテゴリーのみ'
+  // 全作品CSVから取ったときは「全ての作品」だけが入る。この場合は断りが要らない。
+  if (categories.length === 1 && categories[0] === '全ての作品') return ''
+  if (categories.length > 5) return `${categories.length}カテゴリー分`
+
+  return `${categories.join('・')}のみ`
+}
+
+/** B10F は取り込んだカテゴリーのぶんだけなので、それが分かる書き方にする。 */
+function b10fSpanOf(b10f) {
+  if (!b10f?.firstOpenedOn || !b10f?.lastOpenedOn) return ''
+
+  const first = monthLabel(b10f.firstOpenedOn)
+  const last = monthLabel(b10f.lastOpenedOn)
+  const works = `${b10f.works.toLocaleString('ja-JP')}作品`
+  const span = first === last ? first : `${first} 〜 ${last}`
+  const categories = categoryLabel(b10f.categories)
+
+  return categories ? `${span}（${works}／${categories}）` : `${span}（${works}）`
 }
 
 function sourcesOf(person, confirmedOn) {
@@ -200,6 +234,19 @@ function sourcesOf(person, confirmedOn) {
       label: 'ソクミルアフィリエイト WEBサービス',
       url: 'https://sokmil-ad.com/',
       note: `出演者ID ${person.sokmil.sokmilId}`,
+    })
+  }
+
+  // B10F にはウェブサービスが無く、管理画面のカテゴリー別CSVだけが出典。
+  // 数えたカテゴリーを書いておかないと、全作品数だと誤解される。
+  if (person.b10f) {
+    const scope = categoryLabel(person.b10f.categories)
+    const categories = `${scope ? `${scope} / ` : ''}収録作品 ${person.b10f.works.toLocaleString('ja-JP')}件`
+
+    list.push({
+      label: 'B10F アフィリエイト 作品データCSV',
+      url: 'https://affiliate.b10f.jp/',
+      note: categories,
     })
   }
 
@@ -267,6 +314,16 @@ function renderPage(person, { profile, sources, related, indexable }) {
       `DUGA で最新の出演作品を見る${opened}`,
       `https://click.duga.jp/ppv/${encodeURIComponent(person.duga.productId)}/${DUGA_AGENT_ID}-01`,
     ])
+  }
+
+  // B10F も出演者ページが無いので、いちばん新しい出演作品へ案内する。
+  // URLは管理画面のCSVが返した紹介IDつきのものをそのまま使う。
+  if (person.b10f?.productUrl) {
+    const opened = person.b10f.productOpenedOn
+      ? `（${person.b10f.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日配信`)}）`
+      : ''
+
+    works.push([`B10F で最新の出演作品を見る${opened}`, person.b10f.productUrl])
   }
 
   const worksHtml = works.length
@@ -430,6 +487,7 @@ function renderHeadPage(head, members, confirmedOn, groups) {
         ['DUGA', p.duga?.productId
           ? `https://click.duga.jp/ppv/${encodeURIComponent(p.duga.productId)}/${DUGA_AGENT_ID}-01`
           : ''],
+        ['B10F', p.b10f?.productUrl],
       ]
         .filter(([, url]) => url)
         .map(([label, url]) =>
@@ -866,6 +924,26 @@ async function main() {
     sokmilAdded += 1
   }
 
+  // B10F。4社目の出典。ウェブサービスが無く、管理画面のカテゴリー別CSVだけ。
+  // 出演者名が入っている作品が2割ほどしかないので、新しい人は足さず、
+  // すでに他社で名前が分かっている人にだけ結び付ける。
+  try {
+    const file = await readJson(path.join(publicDir, 'data/b10f-products.json'))
+    const categories = file.categories ?? []
+    let b10fMatched = 0
+
+    for (const record of file.performers ?? []) {
+      const found = byName.get(normaliseName(record.name))
+      if (!found || found.b10f) continue
+      found.b10f = { ...record, categories }
+      b10fMatched += 1
+    }
+
+    console.log(`B10F: ${(file.performers ?? []).length}人のうち ${b10fMatched}人が他社の名前と一致しました。`)
+  } catch {
+    console.log('B10F のデータが無いので、そのぶんは載せません。')
+  }
+
   // 名義ごとの収録期間。改名して名前が変わっている人は、
   // それぞれの名前で作品が残っているので、いつ頃どの名前だったかが分かる。
   for (const person of people) {
@@ -910,7 +988,7 @@ async function main() {
     usedSlugs.add(slug)
     person.slug = slug
     person.profile = profileOf(person)
-    person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
+    person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
   }
 
   const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
