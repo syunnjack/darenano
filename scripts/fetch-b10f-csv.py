@@ -64,6 +64,29 @@ TAG = re.compile(r'<a href="([^"]+)"[^>]*>([^<]+)</a>')
 # 候補のうち、CSVに実在したタグだけを使う。
 #
 # 対応表に無いジャンルのページは、これまでどおり3社のままになる。
+# B10F にしか無い区分のうち、ページを作るもの。値は当サイトの slug。
+#
+# **載せないものがある。** 未成年を思わせるもの（女子校生・ロ◯ータ・ジュニアアイドル）、
+# 同意のないもの（レ◯プ・盗◯・鬼畜）、近親相姦、排泄（放尿・スカトロ）は入れない。
+# B10F 自身が伏せ字にしている語もある。検索に載るページの題として出さない。
+#
+# 出演者名が入った作品が少ないタグはページにしても空になるので、
+# **2本以上出ている人が MIN_RANKED 人に満たないタグは飛ばす。**
+B10F_ONLY_GENRES = {
+    'SM': 'sm',
+    'M男・金蹴り': 'm-otoko',
+    '羞恥': 'shuchi',
+    '乳首・おっぱい': 'chikubi',
+    '脚・足コキ': 'ashikoki',
+    'オナニー': 'onanie',
+    'CFNM': 'cfnm',
+    'ギャル・ガン黒': 'gyaru',
+    '手コキ': 'tekoki',
+    'お尻・アナル': 'oshiri-anal',
+}
+
+MIN_RANKED = 5
+
 GENRE_TAGS = {
     '騎乗位': ['騎乗位'],
     '素人': ['素人'],
@@ -218,6 +241,34 @@ def write_genres(products: dict, folder: Path) -> None:
             ],
         })
 
+    # B10F にしか無い区分。当サイトの slug はこちらで決める（他社に同じ区分が無いため）。
+    taken = set(slug_of.values()) | {g['slug'] for g in genres}
+
+    for tag, slug in B10F_ONLY_GENRES.items():
+        if tag not in tags or slug in taken:
+            continue
+
+        bucket = tags[tag]
+        ranked = [(who, count) for who, count in bucket['performers'].items() if count >= 2]
+
+        if len(ranked) < MIN_RANKED:
+            print(f'  「{tag}」は2本以上の人が{len(ranked)}人しかいないので飛ばします。', file=sys.stderr)
+            continue
+
+        genres.append({
+            'name': tag,
+            'slug': slug,
+            'b10fTags': [tag],
+            'b10fOnly': True,
+            'works': bucket['works'],
+            'link': bucket['link'],
+            'performers': [
+                {'name': who, 'works': count}
+                for who, count in sorted(bucket['performers'].items(), key=lambda kv: (-kv[1], kv[0]))
+            ],
+        })
+        taken.add(slug)
+
     target = folder / 'b10f-genres.json'
     target.write_text(json.dumps({
         'confirmedOn': date.today().isoformat(),
@@ -228,6 +279,8 @@ def write_genres(products: dict, folder: Path) -> None:
 
     total = sum(len(g['performers']) for g in genres)
     empty = sum(1 for g in genres if not g['performers'])
+    only = sum(1 for g in genres if g.get('b10fOnly'))
+    print(f'  うち B10F にしか無い区分: {only}件')
     print(f'  ジャンル {len(genres)}件 / のべ出演者 {total:,}人 → {target}')
     print(f'    うち出演者名が1人も入っていないジャンル: {empty}件（リンクと件数だけ）')
     for genre in genres[:5]:

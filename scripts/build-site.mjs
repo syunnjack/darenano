@@ -606,8 +606,10 @@ function renderGenrePage(genre, rows, confirmedOn) {
         各社が作品に付けているジャンルを、そのまま数えたものです。
         題名や紹介文からの推測は含みません。内訳は ${escapeHtml(breakdown)}。
         同じ人が複数の社に出ている場合は合算しています。
-        DUGA とソクミルは人気順の上位までを数えているため、
-        実際の出演本数より少なく出ることがあります。
+        ${genre.b10fOnly
+          ? 'この区分は B10F にしかないため、B10F の作品だけを数えています。'
+          : 'DUGA とソクミルは人気順の上位までを数えているため、'
+            + '実際の出演本数より少なく出ることがあります。'}
         ${bySource.b10f && genre.b10fPerformers
           ? 'B10F は全作品から数えていますが、出演者名が入っている作品が'
             + '全体の6%ほどしかないため、こちらも少なく出ます。'
@@ -1116,7 +1118,29 @@ async function main() {
       const bySlug = new Map((file.genres ?? []).map((g) => [g.slug, g]))
       let merged = 0
 
+      // B10F にしか無い区分は、ジャンルそのものを足す（3社の集計には出てこない）。
+      const known = new Set(genreList.map((g) => g.slug))
+
+      for (const found of file.genres ?? []) {
+        if (!found.b10fOnly || known.has(found.slug)) continue
+
+        genreList.push({
+          name: found.name,
+          slug: found.slug,
+          links: { b10f: found.link },
+          works: found.works,
+          worksBySource: { b10f: found.works },
+          b10fTags: found.b10fTags,
+          b10fPerformers: found.performers.length,
+          b10fOnly: true,
+          performers: found.performers.map((row) => ({ ...row, b10f: row.works })),
+        })
+        known.add(found.slug)
+      }
+
       for (const genre of genreList) {
+        if (genre.b10fOnly) continue
+
         const found = bySlug.get(genre.slug)
         if (!found) continue
 
@@ -1228,7 +1252,7 @@ async function main() {
       mostWorks: targets
         .filter((p) => (p.duga?.works ?? 0) > 0)
         .sort((a, b) => (b.duga.works - a.duga.works) || a.name.localeCompare(b.name, 'ja'))
-        // 右のジャンル一覧（34件）と縦の長さが釣り合うくらいに出す。
+        // 右のジャンル一覧と縦の長さが釣り合うくらいに出す。
         .slice(0, 50)
         .map((p) => ({
           name: p.name,
