@@ -608,9 +608,13 @@ function renderGenrePage(genre, rows, confirmedOn) {
         同じ人が複数の社に出ている場合は合算しています。
         DUGA とソクミルは人気順の上位までを数えているため、
         実際の出演本数より少なく出ることがあります。
-        ${bySource.b10f
+        ${bySource.b10f && genre.b10fPerformers
           ? 'B10F は全作品から数えていますが、出演者名が入っている作品が'
             + '全体の6%ほどしかないため、こちらも少なく出ます。'
+          : ''}
+        ${bySource.b10f && !genre.b10fPerformers
+          ? `B10F の${bySource.b10f.toLocaleString('ja-JP')}件には出演者名が入っていないため、`
+            + '下の並びには反映していません。作品一覧へのリンクだけを置いています。'
           : ''}
       </p>
       ${shopsHtml}
@@ -1120,6 +1124,8 @@ async function main() {
         genre.works = (genre.works ?? 0) + found.works
         genre.links = { ...(genre.links ?? {}), b10f: found.link }
         genre.b10fTags = found.b10fTags
+        // 名前が入った作品が無いジャンルもある。件数とリンクは出すが、並びには入らない。
+        genre.b10fPerformers = found.performers.length
 
         const byName = new Map(genre.performers.map((row) => [normaliseName(row.name), row]))
 

@@ -204,9 +204,8 @@ def write_genres(products: dict, folder: Path) -> None:
             for who, count in bucket['performers'].items():
                 performers[who] = performers.get(who, 0) + count
 
-        if not performers:
-            continue
-
+        # 出演者名が1人も入っていないタグもある（人妻1,277作品・OL235作品など）。
+        # 並べる人はいないが、そのジャンルの作品一覧への行き先としては使えるので残す。
         genres.append({
             'name': name,
             'slug': slug,
@@ -228,7 +227,9 @@ def write_genres(products: dict, folder: Path) -> None:
     }, ensure_ascii=False), encoding='utf-8')
 
     total = sum(len(g['performers']) for g in genres)
+    empty = sum(1 for g in genres if not g['performers'])
     print(f'  ジャンル {len(genres)}件 / のべ出演者 {total:,}人 → {target}')
+    print(f'    うち出演者名が1人も入っていないジャンル: {empty}件（リンクと件数だけ）')
     for genre in genres[:5]:
         print(f"    {genre['name']}（{'・'.join(genre['b10fTags'])}）{genre['works']:,}作品 / {len(genre['performers'])}人")
 
