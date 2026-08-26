@@ -128,7 +128,7 @@ function App() {
       <section className="hero">
         <h1>名前から、出演者のプロフィールを引く</h1>
         <p className="lead">
-          FANZA・DUGA・ソクミルが公開している出演者情報を集めた名鑑です。
+          FANZA・DUGA・ソクミル・B10F が公開している出演者情報を集めた名鑑です。
           {featured
             ? `${featured.total.toLocaleString('ja-JP')}人を収録し、うち${featured.detailed.toLocaleString('ja-JP')}人は生年月日や身長などのプロフィールを確認できています。`
             : ''}
@@ -240,7 +240,7 @@ function App() {
           <aside className="column-side" aria-label="ジャンルから探す">
             <h2>ジャンルから探す</h2>
             <p className="genres-lead">
-              FANZA・DUGA・ソクミルが作品に付けているジャンルごとに、
+              FANZA・DUGA・ソクミル・B10F が作品に付けているジャンルごとに、
               出演本数の多い方を並べています。
             </p>
             <ul className="genre-chips">

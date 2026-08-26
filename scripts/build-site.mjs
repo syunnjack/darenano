@@ -460,7 +460,7 @@ function renderIndexPage(groups, total, detailed, confirmedOn) {
     : ''
 
   const title = `五十音索引｜${SITE_NAME}`
-  const description = `FANZA・DUGA・ソクミルが公開している出演者${total.toLocaleString('ja-JP')}人を、`
+  const description = `FANZA・DUGA・ソクミル・B10F が公開している出演者${total.toLocaleString('ja-JP')}人を、`
     + `読みの頭文字ごとに並べています。うち${detailed.toLocaleString('ja-JP')}人は生年月日や身長などのプロフィールを確認できています。`
 
   return shell({
@@ -657,7 +657,7 @@ function renderGenreIndexPage(genres, confirmedOn) {
       </li>`)
     .join('')
 
-  const description = `FANZA・DUGA・ソクミルが作品に付けているジャンルのうち${genres.length}件について、`
+  const description = `FANZA・DUGA・ソクミル・B10F が作品に付けているジャンルのうち${genres.length}件について、`
     + '出演本数の多い方を並べたページの一覧です。'
 
   return shell({
