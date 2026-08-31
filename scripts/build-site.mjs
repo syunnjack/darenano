@@ -361,7 +361,7 @@ function renderDtiWorks(works) {
   if (!works?.length) return ''
 
   return `<ul class="work-lines">${works
-    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(maskExplicit(work.t))}</a><span class="work-meta">${escapeHtml(work.s)}${work.d ? `／${escapeHtml(jpDate(work.d))}` : ''}</span></li>`)
+    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(maskExplicit(work.t))}</a><span class="work-meta">${escapeHtml(maskExplicit(work.s))}${work.d ? `／${escapeHtml(jpDate(work.d))}` : ''}</span></li>`)
     .join('')}</ul>`
 }
 
@@ -495,7 +495,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const dtiWorksHtml = dtiWorks?.w?.length
     ? `<section class="work-block">
         <h2>無修正サイトでの出演作品<span class="pr">広告</span></h2>
-        <p class="confirmed">カリビアンコム・カリビアンコムプレミアム・HEYZO（DTI CASH）に、この方の名前で ${dtiWorks.n.toLocaleString('ja-JP')} 作品が収録されています。<strong>いずれも無修正の作品です。</strong>リンク先は各サイトの作品ページです。</p>
+        <p class="confirmed">DTI CASH が扱う配信サイトに、この方の名前で ${dtiWorks.n.toLocaleString('ja-JP')} 作品が収録されています。<strong>いずれも無修正の作品です。</strong>配信元は作品ごとに書いてあり、リンク先は各サイトの作品ページです。</p>
         ${renderDtiWorks(dtiWorks.w)}
       </section>`
     : ''

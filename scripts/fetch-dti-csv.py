@@ -36,6 +36,10 @@ OUT_PATH = ROOT / 'data' / 'dti-performer-works.json'
 WORKS_KEPT = 6
 SKIP_NAMES = {'不明', '素人', '一般女性', '-', '―', ''}
 
+# 配信元そのものを載せないもの。排泄を扱うサイトは、darekore.jp の
+# 既存の方針（EXPLICIT に 排泄・スカトロ・ウンコ を入れてある）に揃えて外す。
+SKIP_SITE_WORDS = ('うんこ', 'ウンコ', '排泄', 'スカトロ', '放尿', '浣腸')
+
 
 def parse_date(text: str) -> str:
     """「2026/08/06」を「2026-08-06」にする。読めなければ空文字。"""
@@ -75,6 +79,9 @@ def main() -> int:
 
         # 作品単位のリンクが無い行は使わない（着地点が作品でなければ意味が無い）
         if not link or not title or not movie_id:
+            continue
+
+        if any(word in site for word in SKIP_SITE_WORDS):
             continue
 
         sites[site] = sites.get(site, 0) + 1
