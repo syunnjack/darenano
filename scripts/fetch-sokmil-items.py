@@ -46,7 +46,7 @@ from pathlib import Path
 API = 'https://sokmil-ad.com/api/v1/Item'
 HITS = 100
 INTERVAL = 1.5
-WORKS_PER_ACTOR = 8
+WORKS_PER_ACTOR = 6
 SAVE_EVERY = 5000        # 何件ごとに書き出すか
 
 OUT_DIR = Path(__file__).resolve().parent.parent / 'data'
@@ -160,14 +160,17 @@ def main() -> int:
         for item in items:
             cid = str(item.get('id') or '').strip()
             title = str(item.get('title') or '').strip()
-            url = str(item.get('affiliateURL') or item.get('affiliateUrl') or '').strip()
+            # 作品ページのURLは category と id から組み立てられる。
+            #   https://sokmil.com/<category>/_item/item<id>.htm
+            # 紹介IDを付ける形は build-site.mjs 側に置く（そのぶん出力が軽い）。
+            category = str(item.get('category') or '').strip()
             released = str(item.get('date') or item.get('release_date') or '')[:10]
 
-            if not cid or not title or not url:
+            if not cid or not title or not category:
                 continue
 
             scanned += 1
-            work = {'c': cid, 't': title, 'd': released, 'u': url}
+            work = {'c': cid, 'g': category, 't': title, 'd': released}
 
             for person in (item.get('iteminfo') or {}).get('actor') or []:
                 ident = str(person.get('id') or '').strip()
