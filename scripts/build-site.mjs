@@ -49,6 +49,23 @@ function fanzaCover(cid) {
   return `https://pics.dmm.co.jp/digital/video/${cid}/${cid}ps.jpg`
 }
 
+// MGS動画の紹介コード。**空のときはリンクを出さない。**
+// リポジトリには書かず、GitHub Secrets の MGS_AFFILIATE_CODE から渡す。
+// MGS には作品データのAPIもCSVも無いため、作品単位のリンクは作れない。
+// せめて「この方の名前で検索した結果」へ送る（総合トップや
+// ジャンル検索よりは、見ている人の目当てに近い）。
+const MGS_AFFILIATE_CODE = process.env.MGS_AFFILIATE_CODE || ''
+
+function mgsSearchLink(word) {
+  if (!MGS_AFFILIATE_CODE) return ''
+
+  const code = encodeURIComponent(MGS_AFFILIATE_CODE)
+  return `https://www.mgstage.com/search/cSearch.php?search_word=${encodeURIComponent(word)}`
+    + `&type=top&agef=1&utm_medium=mgs_affiliate&utm_source=mgs_affiliate_linktool`
+    + `&aff=${code}&utm_campaign=mgs_affiliate_linktool&utm_content=${code}`
+    + `&form=mgs_asp_linktool_${code}`
+}
+
 // ソクミルの紹介ID。これもリンクに現れる公開の値。
 const SOKMIL_AFFILIATE_ID = process.env.SOKMIL_AFFILIATE_ID || '25173-001'
 
@@ -400,6 +417,11 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
 
   // B10F も出演者ページが無いので、いちばん新しい出演作品へ案内する。
   // URLは管理画面のCSVが返した紹介IDつきのものをそのまま使う。
+  const mgs = mgsSearchLink(person.name)
+  if (mgs) {
+    works.push([`MGS動画 で「${person.name}」の作品を探す`, mgs])
+  }
+
   if (person.b10f?.productUrl) {
     const opened = person.b10f.productOpenedOn
       ? `（${person.b10f.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日配信`)}）`

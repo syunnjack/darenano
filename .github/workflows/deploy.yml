@@ -44,6 +44,8 @@ jobs:
           # これも公開の値で、API が返す一覧URLに現れる。
           FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
           SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
+          # 未設定なら MGS のリンクは出ない。
+          MGS_AFFILIATE_CODE: ${{ secrets.MGS_AFFILIATE_CODE }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
