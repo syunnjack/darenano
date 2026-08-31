@@ -361,7 +361,7 @@ function renderDtiWorks(works) {
   if (!works?.length) return ''
 
   return `<ul class="work-lines">${works
-    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(work.t)}</a><span class="work-meta">${escapeHtml(work.s)}${work.d ? `／${escapeHtml(jpDate(work.d))}` : ''}</span></li>`)
+    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(maskExplicit(work.t))}</a><span class="work-meta">${escapeHtml(work.s)}${work.d ? `／${escapeHtml(jpDate(work.d))}` : ''}</span></li>`)
     .join('')}</ul>`
 }
 
@@ -882,6 +882,37 @@ const EXPLICIT_WORDS = [
 
 function displayableName(name) {
   return Boolean(name) && !EXPLICIT_WORDS.some((word) => name.includes(word))
+}
+
+// 無修正サイトの作品名にだけ出てくる語。**伏せ字にするためだけに使う。**
+// EXPLICIT_WORDS のほうはページを作るかどうかの判定に使っているので、
+// そちらを膨らませるとシリーズ・レーベルのページが不必要に減る。
+const EXPLICIT_EXTRA = [
+  'マンコ', 'まんこ', 'オマンコ', 'おまんこ', 'マン汁',
+  'チンコ', 'ちんこ', 'チンポ', 'ちんぽ', 'オチンチン', 'おちんちん',
+  'ペニス', '肉棒', '巨根', '極太', 'ザーメン', '精液',
+  '挿入', 'パイパン', 'クンニ', 'ぶっかけ', '顔面騎乗',
+  '淫乱', '淫語', '性交', 'セックス', 'SEX', '膣', '陰毛', '剛毛',
+]
+
+/** 露骨な語を同じ長さの○に置き換える。
+ *
+ * **無修正サイトの作品名に使う。** FANZA・DUGA・ソクミルは配信元が
+ * すでに伏せ字にしているものが多いが、無修正サイトはそのままの語で出す。
+ * 題名そのものは残しつつ、どの作品か分かる形にしておく。
+ */
+function maskExplicit(text) {
+  let masked = String(text ?? '')
+
+  // 長い語から先に置き換える（「中出し」を「中出」で崩さないため）
+  const words = [...EXPLICIT_WORDS, ...EXPLICIT_EXTRA].sort((a, b) => b.length - a.length)
+
+  for (const word of words) {
+    if (!masked.includes(word)) continue
+    masked = masked.split(word).join('○'.repeat(word.length))
+  }
+
+  return masked
 }
 
 const GROUP_KINDS = {
