@@ -34,6 +34,8 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -67,14 +69,29 @@ jobs:
           PY
 
       - name: 変化があれば commit する
+        id: commit
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/
           if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "データに変化はありませんでした。"
             exit 0
           fi
           git commit -m "FANZA の作品データを取り直す"
           git pull --rebase --autostash origin main
           git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  # bot の push では deploy が起動しないため、ここから明示的に呼ぶ。
+  deploy:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    # これが無いと Secret が渡らない（再利用ワークフローは自動では受け取らない）。
+    secrets: inherit
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

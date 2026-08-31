@@ -474,6 +474,9 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks }
           <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
           <a href="/actress/">五十音索引</a>
           <a href="/genre/">ジャンル別</a>
+          <a href="/series/">シリーズ別</a>
+          <a href="/label/">レーベル別</a>
+          <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -766,6 +769,124 @@ function renderGenreIndexPage(genres, confirmedOn) {
 }
 
 /** 索引まわりのページの、共通のひな型。 */
+// 露骨な語を含む名前は、検索に載るページの題として出さない。
+// DUGA のレーベル名で使っている判定と同じ考え方（fetch-duga-csv.py の EXPLICIT）。
+const EXPLICIT_WORDS = [
+  '排泄', '浣腸', '放尿', '小便', 'ウンコ', '糞', 'ゲロ', '嘔吐', 'スカトロ',
+  'フェラ', '手コキ', '素股', 'ハメ', '中出し', 'アナル', '潮吹', '射精', '精子',
+  '乱交', '輪姦', 'レイプ', '強姦', '近親', '痴漢', '露出', '奴隷', '調教',
+  '無修正', 'ロリ', '児童', 'JK', '女子校', 'アヘ', 'アへ', '羞恥',
+]
+
+function displayableName(name) {
+  return Boolean(name) && !EXPLICIT_WORDS.some((word) => name.includes(word))
+}
+
+const GROUP_KINDS = {
+  series: { path: 'series', nav: 'シリーズ別', unit: 'シリーズ' },
+  label: { path: 'label', nav: 'レーベル別', unit: 'レーベル' },
+}
+
+/** シリーズ別・レーベル別のページ。収録作品と、そこに出ている方を並べる。 */
+function renderGroupPage(kind, entry, cast, confirmedOn) {
+  const meta = GROUP_KINDS[kind]
+  const canonical = `${SITE_URL}/${meta.path}/${entry.id}/`
+
+  const description = `FANZA の${meta.unit}「${entry.name}」に収録されている`
+    + `${entry.n.toLocaleString('ja-JP')}作品のうち、新しい${entry.w.length}本と、`
+    + `出演している方${cast.length.toLocaleString('ja-JP')}人を並べています。`
+
+  const castHtml = cast.length
+    ? `<section class="related"><h2>この${meta.unit}に出ている方</h2><div class="chips">${cast
+        .map((row) => `<a href="/actress/${encodeURIComponent(row.slug)}/">${escapeHtml(row.name)}<span class="rank-count">${row.works}本</span></a>`)
+        .join('')}</div></section>`
+    : ''
+
+  return shell({
+    title: `${entry.name}の収録作品｜${SITE_NAME}`,
+    description,
+    canonical,
+    crumbs: `<a href="/${meta.path}/">${escapeHtml(meta.nav)}</a> ＞ ${escapeHtml(entry.name)}`,
+    body: `
+      <h1>${escapeHtml(entry.name)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <section class="work-block">
+        <h2>収録作品<span class="pr">広告</span></h2>
+        ${renderWorkList(entry.w)}
+      </section>
+      ${castHtml}
+      <section class="source-block">
+        <h2>出典</h2>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（ItemList）</a>（${escapeHtml(meta.unit)}ID ${escapeHtml(entry.id)}）</li></ul>
+        <p class="confirmed">FANZA の動画（videoa）で、この${escapeHtml(meta.unit)}に分類されている作品を数えたものです。作品名は FANZA が公開している商品名をそのまま出しています。</p>
+      </section>
+      <script type="application/ld+json">${jsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: `${entry.name}の収録作品`,
+        url: canonical,
+        description,
+        inLanguage: 'ja',
+        isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: `${SITE_URL}/` },
+        breadcrumb: {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: SITE_NAME, item: `${SITE_URL}/` },
+            { '@type': 'ListItem', position: 2, name: meta.nav, item: `${SITE_URL}/${meta.path}/` },
+            { '@type': 'ListItem', position: 3, name: entry.name, item: canonical },
+          ],
+        },
+      })}</script>`,
+  })
+}
+
+/** シリーズ別・レーベル別の入口。 */
+function renderGroupIndexPage(kind, entries, confirmedOn) {
+  const meta = GROUP_KINDS[kind]
+  const description = `FANZA の動画に付けられている${meta.unit}のうち、`
+    + `収録作品の多い${entries.length.toLocaleString('ja-JP')}件を並べています。`
+
+  const list = entries
+    .map((entry) => `<li><a href="/${meta.path}/${entry.id}/">${escapeHtml(entry.name)}</a><span class="rank-count">${entry.n.toLocaleString('ja-JP')}作品</span></li>`)
+    .join('')
+
+  return shell({
+    title: `${meta.nav}に見る出演作品（${entries.length.toLocaleString('ja-JP')}${meta.unit}）｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/${meta.path}/`,
+    crumbs: escapeHtml(meta.nav),
+    body: `
+      <h1>${escapeHtml(meta.nav)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <p class="confirmed">FANZA が作品に付けている${escapeHtml(meta.unit)}をそのまま数えたものです。作品数の少ないものはページを作っていません。</p>
+      <ul class="name-list">${list}</ul>`,
+  })
+}
+
+/** 新着作品。発売日の新しい順。 */
+function renderNewPage(works, confirmedOn) {
+  const description = `FANZA の動画に新しく加わった${works.length}作品を、発売日の新しい順に並べています。`
+
+  return shell({
+    title: `FANZA の新着作品${works.length}本｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/new/`,
+    crumbs: '新着作品',
+    body: `
+      <h1>FANZA の新着作品</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <section class="work-block">
+        <h2>発売日の新しい順<span class="pr">広告</span></h2>
+        ${renderWorkList(works)}
+      </section>
+      <section class="source-block">
+        <h2>出典</h2>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（ItemList）</a></li></ul>
+        <p class="confirmed">作品名は FANZA が公開している商品名をそのまま出しています。</p>
+      </section>`,
+  })
+}
+
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
 <html lang="ja">
@@ -793,6 +914,9 @@ function shell({ title, description, canonical, crumbs, body }) {
           <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
           <a href="/actress/">五十音索引</a>
           <a href="/genre/">ジャンル別</a>
+          <a href="/series/">シリーズ別</a>
+          <a href="/label/">レーベル別</a>
+          <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -1303,6 +1427,73 @@ async function main() {
     )
   }
 
+  // シリーズ別・レーベル別・新着。FANZA の作品データがあるときだけ作る。
+  // 作品数の少ないものはページにしない（表紙が数枚だけの薄いページを増やさないため）。
+  const GROUP_MIN_WORKS = { series: 8, label: 30 }
+  const groupUrls = []
+  let hasNewPage = false
+
+  const slugOfDmmId = new Map(
+    targets.filter((p) => p.fanza?.dmmId).map((p) => [String(p.fanza.dmmId), p])
+  )
+
+  for (const [kind, file] of [['series', 'fanza-series.json'], ['label', 'fanza-labels.json']]) {
+    const key = kind === 'series' ? 'series' : 'labels'
+    let raw = null
+
+    try {
+      raw = (await readJson(path.join(dataDir, file)))[key] ?? {}
+    } catch {
+      console.log(`${GROUP_KINDS[kind].nav}のデータが無いので、そのページは作りません。`)
+      continue
+    }
+
+    const entries = Object.entries(raw)
+      .map(([id, value]) => ({ id, name: value.name, n: value.n ?? 0, w: value.w ?? [], p: value.p ?? {} }))
+      .filter((entry) => entry.n >= GROUP_MIN_WORKS[kind] && entry.w.length > 0 && displayableName(entry.name))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+    const dir = path.join(publicDir, GROUP_KINDS[kind].path)
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+
+    for (const entry of entries) {
+      // 出演者は、このサイトにページがある方だけを並べる（行き先の無い名前は出さない）。
+      const cast = Object.entries(entry.p)
+        .map(([dmmId, works]) => ({ person: slugOfDmmId.get(dmmId), works }))
+        .filter((row) => row.person)
+        .sort((a, b) => b.works - a.works || a.person.name.localeCompare(b.person.name, 'ja'))
+        .map((row) => ({ name: row.person.name, slug: row.person.slug, works: row.works }))
+
+      const target = path.join(dir, entry.id)
+      await mkdir(target, { recursive: true })
+      await writeFile(path.join(target, 'index.html'), renderGroupPage(kind, entry, cast, confirmedOn), 'utf8')
+      groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/${entry.id}/`)
+    }
+
+    if (entries.length) {
+      await writeFile(path.join(dir, 'index.html'), renderGroupIndexPage(kind, entries, confirmedOn), 'utf8')
+      groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/`)
+      console.log(`${GROUP_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`)
+    }
+  }
+
+  // 新着作品。
+  try {
+    const file = await readJson(path.join(dataDir, 'fanza-newest.json'))
+    const works = file.items ?? []
+
+    if (works.length) {
+      const dir = path.join(publicDir, 'new')
+      await mkdir(dir, { recursive: true })
+      await writeFile(path.join(dir, 'index.html'), renderNewPage(works, confirmedOn), 'utf8')
+      hasNewPage = true
+      console.log(`新着作品: ${works.length}本`)
+    }
+  } catch {
+    console.log('新着作品のデータが無いので、そのページは作りません。')
+  }
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -1361,6 +1552,8 @@ async function main() {
     `${SITE_URL}/ranking/`,
     ...(genreList.length ? [`${SITE_URL}/genre/`] : []),
     ...genreList.map((g) => `${SITE_URL}/genre/${g.slug}/`),
+    ...(hasNewPage ? [`${SITE_URL}/new/`] : []),
+    ...groupUrls,
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),

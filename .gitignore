@@ -9,6 +9,9 @@ dist/
 public/actress/
 public/kana/
 public/genre/
+public/series/
+public/label/
+public/new/
 public/ranking/index.html
 public/data/search-index.tsv
 public/data/featured.json
