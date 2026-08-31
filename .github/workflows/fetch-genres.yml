@@ -1,0 +1,80 @@
+name: Fetch genres
+
+# ジャンル別の出演本数と、ジャンルページに並べる作品を取り直す。
+#
+# refresh-data.yml でもできるが、あちらは出演者データの取り直しも一緒に走る。
+# ジャンルだけを少しずつ足したいときはこちらを使う。
+#
+# **1ジャンルあたり10分ほどかかる**（FANZA・DUGA・ソクミルの3社を数えるため）。
+# 全部で64ジャンルあるので、`only` に slug を並べて何回かに分けて回す。
+# 指定しなかったジャンルは前回の結果をそのまま引き継ぐ。
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: '取り直すジャンルの slug（カンマ区切り。空なら全部＝10時間ほどかかる）'
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: ジャンル別の出演本数を数え直す
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
+          DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
+          SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}
+          SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
+          ONLY: ${{ inputs.only }}
+        run: python scripts/fetch-genres.py public/data/genres.json
+
+      # 公開済みURLの記録を更新するために、ここでも生成しておく。
+      - name: ページを生成する
+        run: node scripts/build-site.mjs
+
+      - name: 変化があれば commit する
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/data/genres.json public/data/published-slugs.txt
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+          git commit -m "ジャンル別の集計を取り直す"
+          git pull --rebase --autostash origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  # bot の push では deploy が起動しないため、ここから明示的に呼ぶ。
+  deploy:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
