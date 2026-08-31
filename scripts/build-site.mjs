@@ -365,6 +365,19 @@ function renderDtiWorks(works) {
     .join('')}</ul>`
 }
 
+/** B10F の作品を、題名と配信日の一覧で出す。
+ *
+ * URLはCSVに入っている紹介IDつきのものをそのまま使う。
+ * これまでは代表作品1本しかリンクが無かった。
+ */
+function renderB10fWorks(works) {
+  if (!works?.length) return ''
+
+  return `<ul class="work-lines">${works
+    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(work.t)}</a><span class="work-meta">${escapeHtml(jpDate(work.d))}</span></li>`)
+    .join('')}</ul>`
+}
+
 function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
@@ -500,6 +513,15 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       </section>`
     : ''
 
+  // B10F の出演作品。これまでは代表作品1本へのリンクだけだった。
+  const b10fWorksHtml = person.b10f?.recent?.length
+    ? `<section class="work-block">
+        <h2>B10F での出演作品<span class="pr">広告</span></h2>
+        ${renderB10fWorks(person.b10f.recent)}
+        <p class="confirmed">B10F の作品データCSVに収録されている ${(person.b10f.works ?? 0).toLocaleString('ja-JP')} 作品のうち、配信の新しい ${person.b10f.recent.length} 本です。</p>
+      </section>`
+    : ''
+
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
@@ -557,6 +579,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       ${fanzaWorksHtml}
       ${dugaWorksHtml}
       ${sokmilWorksHtml}
+      ${b10fWorksHtml}
       ${dtiWorksHtml}
       <section class="source-block">
         <h2>出典</h2>

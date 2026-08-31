@@ -138,6 +138,20 @@ def newest_per_category(paths: list[str]) -> list[str]:
     return sorted(others + [path for _stamp, path in newest.values()])
 
 
+# 出演者ページに並べる作品の本数
+WORKS_KEPT = 8
+
+
+def keep_newest(bucket: list, work: dict) -> None:
+    """配信日の新しい順に WORKS_KEPT 本だけ持つ。同じ作品は入れない。"""
+    if any(existing['c'] == work['c'] for existing in bucket):
+        return
+
+    bucket.append(work)
+    bucket.sort(key=lambda w: (w['d'], w['c']), reverse=True)
+    del bucket[WORKS_KEPT:]
+
+
 def displayable(label: str) -> bool:
     return bool(label) and not any(word in label for word in EXPLICIT)
 
@@ -351,11 +365,17 @@ def main() -> None:
                 'productTitle': '',
                 'productUrl': '',
                 'productOpenedOn': '',
+                # 作品単位のリンクにするため、新しいものから WORKS_KEPT 本を持つ。
+                # 代表作品1本だけだと、1ページに1本しかリンクが出ない。
+                'recent': [],
                 'firstOpenedOn': '',
                 'lastOpenedOn': '',
                 'brandCounts': {},
             })
             record['works'] += 1
+
+            keep_newest(record['recent'], {'c': item['id'], 't': item['title'],
+                                           'd': item['openedOn'], 'u': item['url']})
 
             # 代表作品は、いちばん新しく配信されたもの。
             if item['openedOn'] >= record['productOpenedOn']:
