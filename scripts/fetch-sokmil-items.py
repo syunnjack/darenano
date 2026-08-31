@@ -140,6 +140,15 @@ def main() -> int:
     cred = {'api_key': api_key, 'affiliate_id': affiliate_id}
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    # 月で絞ったときに総数が変わるか（＝絞り込みが効くか）を見るためだけの入口。
+    probe_month = os.environ.get('PROBE_MONTH', '').strip()
+    if probe_month:
+        payload = call(cred, 1, probe_month).get('result', {})
+        items = payload.get('items') or []
+        print(f'{probe_month} で絞ったときの total_count =', payload.get('total_count'), file=sys.stderr)
+        print('  返ってきた日付:', [str(item.get('date'))[:10] for item in items[:5]], file=sys.stderr)
+        return 0
+
     if os.environ.get('PROBE', '').strip() == '1':
         payload = call(cred, 1).get('result', {})
         print('total_count =', payload.get('total_count'), file=sys.stderr)
@@ -154,17 +163,22 @@ def main() -> int:
     state = {} if reset else load(state_path)
     actors = {} if reset else load(works_path).get('actors', {})
 
-    offset = int(state.get('nextOffset') or 1)
     scanned = int(state.get('scanned') or 0)
-    total = None
 
     limit_minutes = float(os.environ.get('MAX_MINUTES', '300'))
     started = time.time()
     today = date.today()
+    last_month = f'{today.year:04d}-{today.month:02d}'
+    from_month = os.environ.get('FROM_MONTH', '').strip() or state.get('nextMonth') or START_MONTH
 
-    def save():
+    todo = months(from_month, last_month)
+    if not todo:
+        print('取る月がありません。', file=sys.stderr)
+        return 0
+
+    def save(next_month: str):
         state_path.write_text(json.dumps({
-            'nextOffset': offset, 'scanned': scanned, 'confirmedOn': today.isoformat(),
+            'nextMonth': next_month, 'scanned': scanned, 'confirmedOn': today.isoformat(),
         }, ensure_ascii=False), encoding='utf-8')
         works_path.write_text(json.dumps({
             'confirmedOn': today.isoformat(),
@@ -174,60 +188,57 @@ def main() -> int:
             'actors': actors,
         }, ensure_ascii=False), encoding='utf-8')
 
-    print(f'offset {offset} から取ります。', file=sys.stderr)
-    since_save = 0
+    print(f'{todo[0]} から {todo[-1]} まで {len(todo)}か月ぶんを取ります。', file=sys.stderr)
 
-    while True:
+    for month in todo:
         if (time.time() - started) / 60 >= limit_minutes:
-            print(f'{limit_minutes}分を過ぎたので打ち切ります（次は offset {offset}）。', file=sys.stderr)
+            print(f'{limit_minutes}分を過ぎたので {month} の手前で切り上げます。', file=sys.stderr)
+            save(month)
             break
 
-        payload = call(cred, offset).get('result', {})
+        offset, total, got = 1, None, 0
 
-        if total is None:
-            total = int(payload.get('total_count') or 0)
-            print(f'  作品の総数 {total:,}', file=sys.stderr)
+        while True:
+            payload = call(cred, offset, month).get('result', {})
 
-        items = payload.get('items') or []
-        if not items:
-            print('  これ以上ありません。', file=sys.stderr)
-            break
+            if total is None:
+                total = int(payload.get('total_count') or 0)
 
-        for item in items:
-            cid = str(item.get('id') or '').strip()
-            title = str(item.get('title') or '').strip()
-            # 作品ページのURLは category と id から組み立てられる。
-            #   https://sokmil.com/<category>/_item/item<id>.htm
-            # 紹介IDを付ける形は build-site.mjs 側に置く（そのぶん出力が軽い）。
-            category = str(item.get('category') or '').strip()
-            released = str(item.get('date') or item.get('release_date') or '')[:10]
+            items = payload.get('items') or []
+            if not items:
+                break
 
-            if not cid or not title or not category:
-                continue
+            for item in items:
+                cid = str(item.get('id') or '').strip()
+                title = str(item.get('title') or '').strip()
+                # 作品ページのURLは category と id から組み立てられる。
+                #   https://sokmil.com/<category>/_item/item<id>.htm
+                # 紹介IDを付ける形は build-site.mjs 側に置く（そのぶん出力が軽い）。
+                category = str(item.get('category') or '').strip()
+                released = str(item.get('date') or item.get('release_date') or '')[:10]
 
-            scanned += 1
-            work = {'c': cid, 'g': category, 't': title, 'd': released}
+                if not cid or not title or not category:
+                    continue
 
-            for person in (item.get('iteminfo') or {}).get('actor') or []:
-                ident = str(person.get('id') or '').strip()
-                if ident:
-                    keep_newest(actors.setdefault(ident, {'n': 0, 'w': []})['w'], work)
-                    actors[ident]['n'] += 1
+                scanned += 1
+                got += 1
+                work = {'c': cid, 'g': category, 't': title, 'd': released}
 
-        offset += HITS
-        since_save += HITS
+                for person in (item.get('iteminfo') or {}).get('actor') or []:
+                    ident = str(person.get('id') or '').strip()
+                    if ident:
+                        keep_newest(actors.setdefault(ident, {'n': 0, 'w': []})['w'], work)
+                        actors[ident]['n'] += 1
 
-        if since_save >= SAVE_EVERY:
-            save()
-            since_save = 0
-            print(f'  offset {offset:,} / {total:,}  出演者 {len(actors):,}人', file=sys.stderr)
+            offset += HITS
+            if total and offset > total:
+                break
 
-        if total and offset > total:
-            break
+            time.sleep(INTERVAL)
 
-        time.sleep(INTERVAL)
+        print(f'  {month}  {got:,}件 / APIの総数 {total or 0:,}  出演者 {len(actors):,}人', file=sys.stderr)
+        save(months(month, last_month)[1] if month != last_month else last_month)
 
-    save()
     print(f'\n作品 {scanned:,}件を見て、出演者 {len(actors):,}人にまとめました。', file=sys.stderr)
 
     return 0
