@@ -62,6 +62,8 @@ WORKS_PER_ACTRESS = 8
 WORKS_PER_GROUP = 12
 # 新着ページに並べる本数
 NEWEST = 240
+# シリーズ・レーベルのページに名前を並べる出演者の数
+CAST_PER_GROUP = 40
 
 # FANZA の動画は 1990年代から。これより前は作品がほぼ無い。
 START_MONTH = '1998-01'
@@ -180,6 +182,18 @@ def keep_newest(bucket: list[dict], work: dict, limit: int) -> None:
     del bucket[limit:]
 
 
+def add_cast(bucket: dict, cast: list[tuple[str, str]]) -> None:
+    """シリーズ・レーベルに出ている人を数える。
+
+    出演者IDだけを持ち、名前は出演者データ側から引く。**IDで引けない人は
+    ページに出さない**（darekore.jp に無い人の名前だけを並べても行き先が無い）。
+    """
+    counts = bucket.setdefault('p', {})
+
+    for ident, _ in cast:
+        counts[ident] = counts.get(ident, 0) + 1
+
+
 def main() -> int:
     api_id = os.environ.get('FANZA_API_ID', '').strip()
     affiliate_id = os.environ.get('FANZA_AFFILIATE_ID', '').strip()
@@ -234,8 +248,9 @@ def main() -> int:
                 continue
 
             info = raw.get('iteminfo') or {}
+            cast = names(info, 'actress')
 
-            for ident, _ in names(info, 'actress'):
+            for ident, _ in cast:
                 bucket = actresses.setdefault(ident, {'n': 0, 'w': []})
                 bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_ACTRESS)
@@ -244,11 +259,13 @@ def main() -> int:
                 bucket = series.setdefault(ident, {'name': name, 'n': 0, 'w': []})
                 bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                add_cast(bucket, cast)
 
             for ident, name in names(info, 'label'):
                 bucket = labels.setdefault(ident, {'name': name, 'n': 0, 'w': []})
                 bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                add_cast(bucket, cast)
 
             keep_newest(newest, work, NEWEST)
 
@@ -262,6 +279,13 @@ def main() -> int:
             'lastMonth': month,
         }
         state_path.write_text(json.dumps(state, ensure_ascii=False), encoding='utf-8')
+
+    # 出演者は多いところで数千人になる。ページに並べるぶんだけ残す。
+    for bucket in list(series.values()) + list(labels.values()):
+        counts = bucket.get('p') or {}
+        if len(counts) > CAST_PER_GROUP:
+            top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:CAST_PER_GROUP]
+            bucket['p'] = dict(top)
 
     payload_head = {'confirmedOn': today.isoformat(), 'scanned': scanned,
                     'source': 'FANZA アフィリエイト Web サービス（ItemList）',

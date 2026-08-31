@@ -16,6 +16,9 @@ import { merge, normaliseName, normaliseReading } from './lib/merge.mjs'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const publicDir = path.join(root, 'public')
 const outDir = path.join(publicDir, 'actress')
+// 作品データはページに埋め込むだけで、そのまま配信する必要がない。
+// public/ に置くと dist にも入って配信量が増えるので、外に置く。
+const dataDir = path.join(root, 'data')
 
 const SITE_URL = 'https://darekore.jp'
 const SITE_NAME = 'この子だれ？'
@@ -26,6 +29,25 @@ const CONTACT = 'info@darekore.jp'
 // DUGA の代理店ID。リンクに現れる公開の値で、秘密のキーではない。
 // （FANZA のアフィリエイトIDも、API が返す一覧URLに含まれている。）
 const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
+
+// FANZA のアフィリエイトID。API が返す一覧URLに現れる公開の値。
+// これまで作品単位のリンクが1本も無く、DMM アフィリエイトの
+// 「ダイレクト報酬」が構造的に発生しない状態だった。
+const FANZA_AFFILIATE_ID = process.env.FANZA_AFFILIATE_ID || 'syunnda1-997'
+
+// 作品ページ・表紙画像のURLは品番から組み立てられる。
+// 実際に叩いて確かめてある（旧 detail URL は content へ301する）。
+function fanzaLink(target) {
+  return `https://al.fanza.co.jp/?lurl=${encodeURIComponent(target)}&af_id=${FANZA_AFFILIATE_ID}&ch=api`
+}
+
+function fanzaItemLink(cid) {
+  return fanzaLink(`https://video.dmm.co.jp/av/content/?id=${cid}`)
+}
+
+function fanzaCover(cid) {
+  return `https://pics.dmm.co.jp/digital/video/${cid}/${cid}ps.jpg`
+}
 
 // DUGA ウェブサービスの利用規約で表示が義務づけられているクレジット。
 // 「規定のHTMLソースを利用してください。ソースや画像の改変はできません」と
@@ -253,7 +275,34 @@ function sourcesOf(person, confirmedOn) {
   return { list, confirmedOn }
 }
 
-function renderPage(person, { profile, sources, related, indexable }) {
+function jpDate(iso) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso || '')
+    ? iso.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m, d) => `${Number(y)}年${Number(m)}月${Number(d)}日`)
+    : ''
+}
+
+/** FANZA の作品を表紙つきで並べる。リンク先は作品単位のURL。
+ *
+ * これが無いと、買われた作品とこちらのリンクが結びつかないため
+ * 「ダイレクト報酬」が発生しない。作品タイトルは権利者が API で
+ * 公開している商品名をそのまま出すが、**<title>・meta・構造化データには
+ * 入れない**（検索結果や SNS カードに露骨な語を出さないため）。
+ */
+function renderWorkList(works) {
+  if (!works?.length) return ''
+
+  const items = works
+    .map((work) => `<li class="work"><a href="${escapeHtml(fanzaItemLink(work.c))}" target="_blank" rel="nofollow sponsored noopener">`
+      + `<img src="${escapeHtml(fanzaCover(work.c))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="145" />`
+      + `<span class="work-title">${escapeHtml(work.t)}</span>`
+      + `<span class="work-meta">${escapeHtml(jpDate(work.d))}／${escapeHtml(work.c)}</span>`
+      + '</a></li>')
+    .join('')
+
+  return `<ul class="work-list">${items}</ul>`
+}
+
+function renderPage(person, { profile, sources, related, indexable, fanzaWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
   const title = `${person.name}${reading}のプロフィール｜${SITE_NAME}`
@@ -339,6 +388,19 @@ function renderPage(person, { profile, sources, related, indexable }) {
     ? `<figure class="photo"><img src="${escapeHtml(photo)}" alt="${escapeHtml(person.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="160" height="200" /><figcaption>写真: FANZA</figcaption></figure>`
     : ''
 
+  // FANZA の出演作品。表紙と作品単位のリンクを出す。
+  const fanzaWorksHtml = fanzaWorks?.w?.length
+    ? `<section class="work-block">
+        <h2>FANZA での出演作品<span class="pr">広告</span></h2>
+        ${renderWorkList(fanzaWorks.w)}
+        <p class="confirmed">FANZA の動画（videoa）に収録されている ${fanzaWorks.n.toLocaleString('ja-JP')} 作品のうち、新しい ${fanzaWorks.w.length} 本です。${
+          person.fanza?.listUrl
+            ? `<a href="${escapeHtml(person.fanza.listUrl)}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
+            : ''
+        }</p>
+      </section>`
+    : ''
+
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
@@ -393,6 +455,7 @@ function renderPage(person, { profile, sources, related, indexable }) {
       ${person.reading ? `<p class="reading">読み: ${escapeHtml(person.reading)}</p>` : ''}
       <div class="lead-block">${photoHtml}${profileHtml}</div>
       ${worksHtml}
+      ${fanzaWorksHtml}
       <section class="source-block">
         <h2>出典</h2>
         ${sourcesHtml}
@@ -767,6 +830,15 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .works .button + .button { background:#7a4bb5; }
 .button { display:inline-block; background:#e0574a; color:#fff; text-decoration:none; padding:11px 20px; border-radius:8px; font-weight:700; font-size:15px; }
 .pr { font-size:11px; color:#8a838f; border:1px solid #ddd6dc; border-radius:4px; padding:1px 6px; }
+/* 出演作品。表紙を並べて、1本ずつ作品ページへ送る。 */
+.work-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.work-block h2 { display:flex; align-items:center; gap:8px; }
+.work-list { list-style:none; padding:0; margin:12px 0 8px; display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:16px 12px; }
+.work a { display:block; color:#3b3546; text-decoration:none; }
+.work img { display:block; width:100%; height:auto; aspect-ratio:100/145; object-fit:cover; border-radius:6px; border:1px solid #ecdfe2; background:#fff; }
+.work-title { display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; line-height:1.45; margin-top:6px; }
+.work-meta { display:block; font-size:11px; color:#8a838f; margin-top:3px; }
+.work a:hover .work-title { color:#8b4054; text-decoration:underline; }
 .source-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
@@ -843,6 +915,10 @@ footer a { color:#8b4054; }
   .profile th, .profile td, .profile, .thin, .chips a, .kana-nav a { border-color:#332d3d; }
   .name-list a { color:#ded8e6; }
   .name-list li { border-color:#2a2532; }
+  .work a { color:#ded8e6; }
+  .work img { border-color:#332d3d; background:#211e28; }
+  .work-block { border-color:#332d3d; }
+  .work a:hover .work-title { color:#f0908a; }
   .shops .shop { border-color:#332d3d; background:#211e28; color:#f0908a; }
   .crumbs a, .sources a, .chips a, .kana-nav a, footer a, .name-list a:hover { color:#f0908a; }
   .site-head { border-color:#332d3d; }
@@ -1018,6 +1094,17 @@ async function main() {
     members.sort((a, b) => (a.reading || a.name).localeCompare(b.reading || b.name, 'ja'))
   }
 
+  // FANZA の作品データ。出演者ごとの出演作品と、シリーズ・レーベル別ページのもと。
+  // まだ取っていないときは、無いまま作る（これまでどおりのページになる）。
+  let fanzaWorksOf = new Map()
+  try {
+    const file = await readJson(path.join(dataDir, 'fanza-actress-works.json'))
+    fanzaWorksOf = new Map(Object.entries(file.actresses ?? {}))
+    console.log(`FANZA の作品: ${fanzaWorksOf.size.toLocaleString('ja-JP')}人ぶん（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+  } catch {
+    console.log('FANZA の作品データが無いので、出演作品は並べません。')
+  }
+
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
   await writeFile(path.join(outDir, 'page.css'), PAGE_CSS, 'utf8')
@@ -1036,6 +1123,7 @@ async function main() {
       sources: sourcesOf(person, confirmedOn),
       related,
       indexable: person.indexable,
+      fanzaWorks: person.fanza?.dmmId ? fanzaWorksOf.get(String(person.fanza.dmmId)) : null,
     })
 
     const dir = path.join(outDir, person.slug)

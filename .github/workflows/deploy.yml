@@ -40,6 +40,9 @@ jobs:
           # 匿名キーは公開してよい値。守りはデータベース側の RLS。
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # 作品単位のアフィリエイトリンクを組み立てるのに要る。
+          # これも公開の値で、API が返す一覧URLに現れる。
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
