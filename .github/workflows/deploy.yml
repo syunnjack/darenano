@@ -43,6 +43,7 @@ jobs:
           # 作品単位のアフィリエイトリンクを組み立てるのに要る。
           # これも公開の値で、API が返す一覧URLに現れる。
           FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

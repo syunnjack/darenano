@@ -49,6 +49,16 @@ function fanzaCover(cid) {
   return `https://pics.dmm.co.jp/digital/video/${cid}/${cid}ps.jpg`
 }
 
+// ソクミルの紹介ID。これもリンクに現れる公開の値。
+const SOKMIL_AFFILIATE_ID = process.env.SOKMIL_AFFILIATE_ID || '25173-001'
+
+// 作品ページのURLは category と id から組み立てられる（APIの応答で確認済み）。
+function sokmilItemLink(category, id) {
+  const url = `https://sokmil.com/${category}/_item/item${id}.htm`
+  const affi = encodeURIComponent(SOKMIL_AFFILIATE_ID)
+  return `${url}?affi=${affi}&utm_source=sokmil_ad&utm_medium=affiliate&utm_campaign=${affi}`
+}
+
 // DUGA ウェブサービスの利用規約で表示が義務づけられているクレジット。
 // 「規定のHTMLソースを利用してください。ソースや画像の改変はできません」と
 // されているため、rel などを足さずそのままの形で出す。
@@ -316,7 +326,16 @@ function renderDugaWorks(works) {
     .join('')}</ul>`
 }
 
-function renderPage(person, { profile, sources, related, indexable, fanzaWorks }) {
+/** ソクミルの作品を、題名と配信日の一覧で出す。リンク先は作品単位のURL。 */
+function renderSokmilWorks(works) {
+  if (!works?.length) return ''
+
+  return `<ul class="work-lines">${works
+    .map((work) => `<li><a href="${escapeHtml(sokmilItemLink(work.g, work.c))}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(work.t)}</a><span class="work-meta">${escapeHtml(jpDate(work.d))}</span></li>`)
+    .join('')}</ul>`
+}
+
+function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
   const title = `${person.name}${reading}のプロフィール｜${SITE_NAME}`
@@ -424,6 +443,19 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks }
       </section>`
     : ''
 
+  // ソクミルの出演作品。これまでは出演者のページへのリンクだけだった。
+  const sokmilWorksHtml = sokmilWorks?.w?.length
+    ? `<section class="work-block">
+        <h2>ソクミル での出演作品<span class="pr">広告</span></h2>
+        ${renderSokmilWorks(sokmilWorks.w)}
+        <p class="confirmed">ソクミルに収録されている ${sokmilWorks.n.toLocaleString('ja-JP')} 作品のうち、配信の新しい ${sokmilWorks.w.length} 本です。${
+          person.sokmil?.affiliateURL
+            ? `<a href="${escapeHtml(person.sokmil.affiliateURL)}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
+            : ''
+        }</p>
+      </section>`
+    : ''
+
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
@@ -480,6 +512,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks }
       ${worksHtml}
       ${fanzaWorksHtml}
       ${dugaWorksHtml}
+      ${sokmilWorksHtml}
       <section class="source-block">
         <h2>出典</h2>
         ${sourcesHtml}
@@ -1262,6 +1295,16 @@ async function main() {
     console.log('FANZA の作品データが無いので、出演作品は並べません。')
   }
 
+  // ソクミルの作品データ。
+  let sokmilWorksOf = new Map()
+  try {
+    const file = await readJson(path.join(dataDir, 'sokmil-actor-works.json'))
+    sokmilWorksOf = new Map(Object.entries(file.actors ?? {}))
+    console.log(`ソクミルの作品: ${sokmilWorksOf.size.toLocaleString('ja-JP')}人ぶん（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+  } catch {
+    console.log('ソクミルの作品データが無いので、出演作品は並べません。')
+  }
+
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
   await writeFile(path.join(outDir, 'page.css'), PAGE_CSS, 'utf8')
@@ -1281,6 +1324,7 @@ async function main() {
       related,
       indexable: person.indexable,
       fanzaWorks: person.fanza?.dmmId ? fanzaWorksOf.get(String(person.fanza.dmmId)) : null,
+      sokmilWorks: person.sokmil?.sokmilId ? sokmilWorksOf.get(String(person.sokmil.sokmilId)) : null,
     })
 
     const dir = path.join(outDir, person.slug)
