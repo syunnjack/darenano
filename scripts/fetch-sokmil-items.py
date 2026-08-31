@@ -14,6 +14,12 @@ PPV も会員登録も、こちらのリンクとは結びつきにくい。
 
   https://sokmil-ad.com/api/v1/Item?hits=100&offset=N
 
+**offset には上限がある。** total_count は 229,953 と返ってくるのに、
+offset 9,601 で items が空になる（2026-09-01 実測）。素直に offset を
+進めるだけでは 9,600 件しか取れない。**FANZA と同じく発売月で区切る。**
+
+  &gte_date=YYYY-MM-01&lte_date=（翌月の1日）
+
 **連続で叩くと 403 を返す。** fetch-sokmil.py と同じく間隔を空け、
 403 のときは長めに待つ。
 
@@ -28,7 +34,9 @@ PPV も会員登録も、こちらのリンクとは結びつきにくい。
   SOKMIL_API_KEY / SOKMIL_AFFILIATE_ID
   MAX_MINUTES   これを過ぎたら打ち切る（既定 300 分）
   RESET         1 なら前回の結果を捨てて最初から
+  FROM_MONTH    取り直しの開始月（YYYY-MM。既定は前回の続き）
   PROBE         1 なら最初の1件をそのまま表示して終わる（応答の形を見るため）
+  PROBE_MONTH   その月で絞ったときの総数と日付を表示して終わる（絞り込みが効くかの確認）
 
 使い方:
   SOKMIL_API_KEY=xxx SOKMIL_AFFILIATE_ID=yyy python scripts/fetch-sokmil-items.py
@@ -47,13 +55,41 @@ API = 'https://sokmil-ad.com/api/v1/Item'
 HITS = 100
 INTERVAL = 1.5
 WORKS_PER_ACTOR = 6
-SAVE_EVERY = 5000        # 何件ごとに書き出すか
+# ソクミルの配信は2000年代から。これより前はほぼ無い。
+START_MONTH = '2000-01'
 
 OUT_DIR = Path(__file__).resolve().parent.parent / 'data'
 
 
-def call(cred: dict, offset: int) -> dict:
+def months(start: str, end: str) -> list:
+    sy, sm = (int(x) for x in start.split('-'))
+    ey, em = (int(x) for x in end.split('-'))
+    out = []
+
+    while (sy, sm) <= (ey, em):
+        out.append(f'{sy:04d}-{sm:02d}')
+        sm += 1
+        if sm > 12:
+            sy, sm = sy + 1, 1
+
+    return out
+
+
+def month_bounds(month: str) -> tuple:
+    year, mon = (int(x) for x in month.split('-'))
+    nxt_y, nxt_m = (year + 1, 1) if mon == 12 else (year, mon + 1)
+
+    return f'{year:04d}-{mon:02d}-01', f'{nxt_y:04d}-{nxt_m:02d}-01'
+
+
+def call(cred: dict, offset: int, month: str = '') -> dict:
     params = dict(cred, output='json', hits=HITS, offset=offset)
+
+    if month:
+        gte, lte = month_bounds(month)
+        params['gte_date'] = gte
+        params['lte_date'] = lte
+
     query = urllib.parse.urlencode(params)
 
     for attempt in range(5):

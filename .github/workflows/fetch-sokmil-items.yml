@@ -16,6 +16,14 @@ on:
         description: '応答の形だけ見て終わる'
         type: boolean
         default: false
+      probe_month:
+        description: 'この月で絞ったときの総数だけ見て終わる（YYYY-MM）'
+        type: string
+        required: false
+      from_month:
+        description: '取り始める月（YYYY-MM。空なら前回の続き）'
+        type: string
+        required: false
       max_minutes:
         description: '何分で打ち切るか'
         type: string
@@ -49,11 +57,13 @@ jobs:
           MAX_MINUTES: ${{ inputs.max_minutes }}
           RESET: ${{ inputs.reset && '1' || '' }}
           PROBE: ${{ inputs.probe && '1' || '' }}
+          PROBE_MONTH: ${{ inputs.probe_month }}
+          FROM_MONTH: ${{ inputs.from_month }}
         run: python scripts/fetch-sokmil-items.py
 
       - name: 変化があれば commit する
         id: commit
-        if: ${{ !inputs.probe }}
+        if: ${{ !inputs.probe && !inputs.probe_month }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
