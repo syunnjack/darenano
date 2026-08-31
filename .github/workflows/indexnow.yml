@@ -31,9 +31,12 @@ jobs:
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "手動実行なので、サイトマップ全体を送ります。"
-            curl -fsS "https://darekore.jp/sitemap.xml" \
-              | grep -oP '(?<=<loc>)[^<]+' \
-              | head -10000 > urls.txt
+            # head でパイプを閉じると grep が SIGPIPE で落ち、pipefail のせいで
+            # ジョブごと失敗する。いったん全部書き出してから切る。
+            curl -fsS "https://darekore.jp/sitemap.xml" > sitemap.xml
+            grep -oP '(?<=<loc>)[^<]+' sitemap.xml > all-urls.txt
+            head -10000 all-urls.txt > urls.txt
+            echo "サイトマップ $(wc -l < all-urls.txt)件のうち $(wc -l < urls.txt)件を送ります。"
           else
             # 直前のコミットとの差分で、増えたスラッグだけを拾う。
             git diff HEAD~1 HEAD -- public/data/published-slugs.txt \
