@@ -811,6 +811,14 @@ function renderGenrePage(genre, rows, confirmedOn) {
           : ''}
       </p>
       ${shopsHtml}
+      ${genre.fanzaWorks?.length
+        ? `<section class="work-block">
+            <h2>このジャンルの作品<span class="pr">広告</span></h2>
+            ${renderWorkList(genre.fanzaWorks)}
+            <p class="confirmed">FANZA の人気順で上位 ${genre.fanzaWorks.length} 本です。作品名は FANZA が公開している商品名をそのまま出しています。</p>
+          </section>`
+        : ''}
+      <h2>出演本数の多い方</h2>
       <ol class="rank-list">${list}</ol>
       <script type="application/ld+json">${JSON.stringify({
         '@context': 'https://schema.org',

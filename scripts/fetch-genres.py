@@ -55,6 +55,7 @@ SOKMIL_BASE = 'https://sokmil-ad.com/api/v1'
 
 FANZA_MAX_OFFSET = 50000      # API の上限
 SCAN_LIMIT = 5000             # DUGA・ソクミルはここまで（時間の都合）
+WORKS_PER_GENRE = 8           # ジャンルページに並べる FANZA の作品数
 DUGA_CATEGORY_SCAN = 4000     # カテゴリ名→ID を作るために見る作品数
 
 # 取り上げるジャンル。名前は FANZA の表記のまま。
@@ -98,6 +99,39 @@ GENRES = [
     {'name': 'OL', 'slug': 'ol'},
     {'name': '女子大生', 'slug': 'joshidaisei'},
     {'name': 'スレンダー', 'slug': 'slender'},
+    # ここから 2026-09-01 に追加。FANZA のジャンル一覧（332件）に実在するものだけ。
+    # 未成年を思わせるもの・同意のないもの・近親相姦・排泄は入れない
+    # （既存の EXPLICIT / B10F の方針と揃える）。
+    {'name': 'ギャル', 'slug': 'gyaru'},
+    {'name': '美乳', 'slug': 'binyu'},
+    {'name': '貧乳・微乳', 'slug': 'hinnyu', 'duga': ['貧乳'], 'sokmil': ['貧乳']},
+    {'name': '母乳', 'slug': 'bonyu'},
+    {'name': 'パイパン', 'slug': 'paipan'},
+    {'name': 'めがね', 'slug': 'megane', 'aka': ['メガネ', '眼鏡']},
+    {'name': '女教師', 'slug': 'jokyoshi'},
+    {'name': '女医', 'slug': 'joi'},
+    {'name': '女子アナ', 'slug': 'joshi-ana'},
+    {'name': '秘書', 'slug': 'hisho'},
+    {'name': '家庭教師', 'slug': 'kateikyoshi'},
+    {'name': 'セーラー服', 'slug': 'sailor'},
+    {'name': '体操着・ブルマ', 'slug': 'bloomer', 'duga': ['ブルマ'], 'sokmil': ['ブルマ'], 'aka': ['ブルマ']},
+    {'name': 'チアガール', 'slug': 'cheergirl'},
+    {'name': 'バニーガール', 'slug': 'bunnygirl'},
+    {'name': 'チャイナドレス', 'slug': 'chinadress'},
+    {'name': 'レオタード', 'slug': 'leotard'},
+    {'name': 'ランジェリー', 'slug': 'lingerie'},
+    {'name': 'パンスト・タイツ', 'slug': 'pansuto', 'duga': ['パンスト'], 'sokmil': ['パンスト'], 'aka': ['パンスト', 'タイツ']},
+    {'name': '和服・浴衣', 'slug': 'wafuku', 'duga': ['浴衣'], 'sokmil': ['浴衣'], 'aka': ['浴衣', '着物']},
+    {'name': '裸エプロン', 'slug': 'hadaka-apron'},
+    {'name': 'ナンパ', 'slug': 'nanpa'},
+    {'name': '温泉', 'slug': 'onsen'},
+    {'name': 'お風呂', 'slug': 'ofuro'},
+    {'name': 'ホテル', 'slug': 'hotel'},
+    {'name': 'エステ', 'slug': 'este'},
+    {'name': '不倫', 'slug': 'furin'},
+    {'name': '未亡人', 'slug': 'miboujin'},
+    {'name': '妊婦', 'slug': 'ninpu'},
+    {'name': 'ハーレム', 'slug': 'harem'},
 ]
 
 
@@ -166,10 +200,13 @@ def fanza_genres(cred: dict, floor_id: str) -> dict:
     return table
 
 
-def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int, str]:
+def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, int, str, list]:
     counts, readings, ids, seen = Counter(), {}, {}, set()
     offset, total = 1, None
     top = ''   # 人気順1位の作品。ジャンル一覧のURLをAPIが返さないため、代わりに使う。
+    # ジャンルページに並べる作品。**人気順に見ているので、先頭から取れば人気上位**。
+    # これまでジャンルページには作品単位のリンクが「人気1位」の1本しか無かった。
+    picks = []
 
     while True:
         payload = fetch(f'{FANZA_BASE}/ItemList?' + urllib.parse.urlencode(dict(
@@ -190,6 +227,12 @@ def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, in
             seen.add(key)
             if not top:
                 top = item.get('affiliateURL') or ''
+
+            if len(picks) < WORKS_PER_GENRE:
+                cid = str(item.get('content_id') or '').strip()
+                title = str(item.get('title') or '').strip()
+                if cid and title:
+                    picks.append({'c': cid, 't': title, 'd': str(item.get('date') or '')[:10]})
             for person in (item.get('iteminfo') or {}).get('actress') or []:
                 name = (person.get('name') or '').strip()
                 if not name:
@@ -205,7 +248,7 @@ def fanza_count(cred: dict, genre_id: str) -> tuple[Counter, dict, dict, int, in
             break
         time.sleep(0.5)
 
-    return counts, readings, ids, total or 0, len(seen), top
+    return counts, readings, ids, total or 0, len(seen), top, picks
 
 
 # ---------------------------------------------------------------- DUGA
@@ -504,10 +547,11 @@ def main() -> None:
         readings, dmm_ids = {}, {}
         works, scanned = {}, {}
         fanza_top = duga_top = ''
+        fanza_picks = []
 
         fanza_id = look_up(fanza_table, genre, 'fanza')
         if fanza_id:
-            counts, reads, ids, total, seen, fanza_top = fanza_count(fanza, fanza_id)
+            counts, reads, ids, total, seen, fanza_top, fanza_picks = fanza_count(fanza, fanza_id)
             per_source['fanza'] = counts
             readings.update(reads)
             dmm_ids.update(ids)
@@ -567,6 +611,8 @@ def main() -> None:
             'works': sum(works.values()),
             'worksBySource': works,
             'scannedBySource': scanned,
+            # FANZA の人気順の上位作品。ジャンルページに表紙つきで並べる。
+            'fanzaWorks': fanza_picks,
             'performers': people,
         }
         if genre.get('aka'):
