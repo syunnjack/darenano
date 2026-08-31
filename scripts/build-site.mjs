@@ -352,7 +352,20 @@ function renderSokmilWorks(works) {
     .join('')}</ul>`
 }
 
-function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks }) {
+/** DTI CASH の作品。CSVに作品単位のアフィリエイトリンクが入っているのでそれを使う。
+ *
+ * **中身は無修正なので、その旨を書き添える。** 出すのは、その人に実際に
+ * 作品がある出演者ページだけ。サイト全体に貼るような出し方はしない。
+ */
+function renderDtiWorks(works) {
+  if (!works?.length) return ''
+
+  return `<ul class="work-lines">${works
+    .map((work) => `<li><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(work.t)}</a><span class="work-meta">${escapeHtml(work.s)}${work.d ? `／${escapeHtml(jpDate(work.d))}` : ''}</span></li>`)
+    .join('')}</ul>`
+}
+
+function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
   const title = `${person.name}${reading}のプロフィール｜${SITE_NAME}`
@@ -478,6 +491,15 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       </section>`
     : ''
 
+  // DTI CASH の出演作品。無修正なので、見る前に分かるように書く。
+  const dtiWorksHtml = dtiWorks?.w?.length
+    ? `<section class="work-block">
+        <h2>無修正サイトでの出演作品<span class="pr">広告</span></h2>
+        <p class="confirmed">カリビアンコム・カリビアンコムプレミアム・HEYZO（DTI CASH）に、この方の名前で ${dtiWorks.n.toLocaleString('ja-JP')} 作品が収録されています。<strong>いずれも無修正の作品です。</strong>リンク先は各サイトの作品ページです。</p>
+        ${renderDtiWorks(dtiWorks.w)}
+      </section>`
+    : ''
+
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
@@ -535,6 +557,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       ${fanzaWorksHtml}
       ${dugaWorksHtml}
       ${sokmilWorksHtml}
+      ${dtiWorksHtml}
       <section class="source-block">
         <h2>出典</h2>
         ${sourcesHtml}
@@ -1327,6 +1350,16 @@ async function main() {
     console.log('ソクミルの作品データが無いので、出演作品は並べません。')
   }
 
+  // DTI CASH の作品データ。氏名で突き合わせる（出演者IDが無いため）。
+  let dtiWorksOf = new Map()
+  try {
+    const file = await readJson(path.join(dataDir, 'dti-performer-works.json'))
+    dtiWorksOf = new Map((file.performers ?? []).map((row) => [normaliseName(row.name), row]))
+    console.log(`DTI CASH の作品: ${dtiWorksOf.size.toLocaleString('ja-JP')}人ぶん（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+  } catch {
+    console.log('DTI CASH の作品データが無いので、出演作品は並べません。')
+  }
+
   await rm(outDir, { recursive: true, force: true })
   await mkdir(outDir, { recursive: true })
   await writeFile(path.join(outDir, 'page.css'), PAGE_CSS, 'utf8')
@@ -1347,6 +1380,7 @@ async function main() {
       indexable: person.indexable,
       fanzaWorks: person.fanza?.dmmId ? fanzaWorksOf.get(String(person.fanza.dmmId)) : null,
       sokmilWorks: person.sokmil?.sokmilId ? sokmilWorksOf.get(String(person.sokmil.sokmilId)) : null,
+      dtiWorks: dtiWorksOf.get(normaliseName(person.name)) ?? null,
     })
 
     const dir = path.join(outDir, person.slug)
