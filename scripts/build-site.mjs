@@ -302,6 +302,20 @@ function renderWorkList(works) {
   return `<ul class="work-list">${items}</ul>`
 }
 
+/** DUGA の作品を、題名と公開日の一覧で出す。リンク先は作品単位のURL。
+ *
+ * DUGA は「規定のHTMLソースを利用してください。ソースや画像の改変はできません」と
+ * しているため、**表紙画像は使わない**（FANZA のように自前の並びに嵌め込まない）。
+ * 直したいのはリンクの単位のほうで、これまでは1ページに代表作品1本しか無かった。
+ */
+function renderDugaWorks(works) {
+  if (!works?.length) return ''
+
+  return `<ul class="work-lines">${works
+    .map((work) => `<li><a href="https://click.duga.jp/ppv/${encodeURIComponent(work.c)}/${DUGA_AGENT_ID}-01" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(work.t)}</a><span class="work-meta">${escapeHtml(jpDate(work.d))}</span></li>`)
+    .join('')}</ul>`
+}
+
 function renderPage(person, { profile, sources, related, indexable, fanzaWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
@@ -401,6 +415,15 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks }
       </section>`
     : ''
 
+  // DUGA の出演作品。これまでは代表作品1本へのリンクだけだった。
+  const dugaWorksHtml = person.duga?.recent?.length
+    ? `<section class="work-block">
+        <h2>DUGA での出演作品<span class="pr">広告</span></h2>
+        ${renderDugaWorks(person.duga.recent)}
+        <p class="confirmed">DUGA の作品データCSVに収録されている ${(person.duga.works ?? 0).toLocaleString('ja-JP')} 作品のうち、公開の新しい ${person.duga.recent.length} 本です。</p>
+      </section>`
+    : ''
+
   const sourcesHtml = `<ul class="sources">${sources.list
     .map((s) => `<li><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>（${escapeHtml(s.note)}）</li>`)
     .join('')}</ul>`
@@ -456,6 +479,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks }
       <div class="lead-block">${photoHtml}${profileHtml}</div>
       ${worksHtml}
       ${fanzaWorksHtml}
+      ${dugaWorksHtml}
       <section class="source-block">
         <h2>出典</h2>
         ${sourcesHtml}
@@ -963,6 +987,11 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .work-title { display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; line-height:1.45; margin-top:6px; }
 .work-meta { display:block; font-size:11px; color:#8a838f; margin-top:3px; }
 .work a:hover .work-title { color:#8b4054; text-decoration:underline; }
+.work-lines { list-style:none; padding:0; margin:12px 0 8px; }
+.work-lines li { padding:8px 0; border-bottom:1px solid #f2e8ea; font-size:14px; }
+.work-lines a { color:#3b3546; text-decoration:none; }
+.work-lines a:hover { color:#8b4054; text-decoration:underline; }
+.work-lines .work-meta { display:block; }
 .source-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
@@ -1043,6 +1072,9 @@ footer a { color:#8b4054; }
   .work img { border-color:#332d3d; background:#211e28; }
   .work-block { border-color:#332d3d; }
   .work a:hover .work-title { color:#f0908a; }
+  .work-lines a { color:#ded8e6; }
+  .work-lines li { border-color:#2a2532; }
+  .work-lines a:hover { color:#f0908a; }
   .shops .shop { border-color:#332d3d; background:#211e28; color:#f0908a; }
   .crumbs a, .sources a, .chips a, .kana-nav a, footer a, .name-list a:hover { color:#f0908a; }
   .site-head { border-color:#332d3d; }
@@ -1095,6 +1127,7 @@ async function main() {
     record.lastOpenedOn = found.lastOpenedOn
     record.productOpenedOn = found.productOpenedOn
     record.labels = found.labels
+    record.recent = found.recent ?? []
   }
 
   // ソクミル。3社目の出典。カップ数は FANZA にも DUGA にも無い項目。

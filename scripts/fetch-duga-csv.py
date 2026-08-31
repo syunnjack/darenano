@@ -32,6 +32,20 @@ SOURCE_URL = 'https://duga.jp/productcsv/'
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0 Safari/537.36')
 
+# 出演者ページに並べる作品の本数
+WORKS_KEPT = 8
+
+
+def keep_newest(bucket: list, work: dict) -> None:
+    """公開日の新しい順に WORKS_KEPT 本だけ持つ。同じ作品は入れない。"""
+    if any(existing['c'] == work['c'] for existing in bucket):
+        return
+
+    bucket.append(work)
+    bucket.sort(key=lambda w: (w['d'], w['c']), reverse=True)
+    del bucket[WORKS_KEPT:]
+
+
 # 出演者名として扱わないもの（CSVに紛れ込む表記）
 SKIP_NAMES = {'不明', '素人', '一般女性', '（不明）', '-', '―'}
 
@@ -103,6 +117,9 @@ def main() -> None:
                 'works': 0,
                 'productId': '',
                 'productOpenedOn': '',
+                # 作品単位のリンクにするため、新しいものから WORKS_KEPT 本を持つ。
+                # 代表作品1本だけだと「ダイレクト報酬」が1ページ1本しか狙えない。
+                'works_list': [],
                 'firstOpenedOn': '',
                 'lastOpenedOn': '',
                 'labelCounts': {},
@@ -113,6 +130,10 @@ def main() -> None:
             if product_id and opened >= record['productOpenedOn']:
                 record['productId'] = product_id
                 record['productOpenedOn'] = opened
+
+            title = (row.get('タイトル') or '').strip()
+            if product_id and title:
+                keep_newest(record['works_list'], {'c': product_id, 't': title, 'd': opened})
 
             label = (row.get('レーベル名') or '').strip()
             if displayable(label):
@@ -127,6 +148,7 @@ def main() -> None:
 
     # 作品数の多い順に、上位3つのレーベルだけ残す。
     for record in performers.values():
+        record['recent'] = record.pop('works_list')
         counts = record.pop('labelCounts')
         ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         record['labels'] = [name for name, _count in ordered[:3]]
