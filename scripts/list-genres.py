@@ -37,8 +37,8 @@ def main() -> None:
     helpers = load_helpers()
     credentials = {'api_id': api_id, 'affiliate_id': affiliate_id}
 
-    floor_id = helpers['videoa_floor_id'](credentials)
-    table = helpers['genre_ids'](credentials, floor_id)
+    floor_id = helpers['fanza_floor_id'](credentials)
+    table = helpers['fanza_genres'](credentials, floor_id)
 
     keyword = (os.environ.get('KEYWORD') or '').strip()
     names = sorted(table)
