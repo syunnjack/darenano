@@ -97,7 +97,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/genres.json public/data/published-slugs.txt
+          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/genres.json public/data/published-slugs.txt public/data/published-pages.txt
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "データに変化はありませんでした。"

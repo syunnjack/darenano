@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - 'public/data/published-slugs.txt'
+      - 'public/data/published-pages.txt'
   workflow_dispatch:
 
 jobs:
@@ -38,13 +39,25 @@ jobs:
             head -10000 all-urls.txt > urls.txt
             echo "サイトマップ $(wc -l < all-urls.txt)件のうち $(wc -l < urls.txt)件を送ります。"
           else
-            # 直前のコミットとの差分で、増えたスラッグだけを拾う。
+            # 直前のコミットとの差分で、増えたぶんだけを拾う。
+            #
+            # **2つのファイルを見る。** 出演者はスラッグ、それ以外
+            # （シリーズ・レーベル・同人・新着など）は URL がそのまま入っている。
+            # 以前は前者しか見ておらず、8,000ページ増えても1件も通知されなかった。
+            : > new-urls.txt
+
             git diff HEAD~1 HEAD -- public/data/published-slugs.txt \
               | grep '^+[^+]' | sed 's/^+//' \
               | while read -r slug; do
                   [ -n "$slug" ] && printf 'https://darekore.jp/actress/%s/\n' \
                     "$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$slug")"
-                done | head -10000 > urls.txt
+                done >> new-urls.txt
+
+            git diff HEAD~1 HEAD -- public/data/published-pages.txt \
+              | grep '^+https://' | sed 's/^+//' >> new-urls.txt
+
+            # ここも head でパイプを閉じないよう、ファイル経由で切る。
+            head -10000 new-urls.txt > urls.txt
           fi
 
           count=$(wc -l < urls.txt)

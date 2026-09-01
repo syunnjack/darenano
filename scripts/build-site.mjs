@@ -1918,6 +1918,15 @@ async function main() {
     'utf8'
   )
 
+  // 出演者以外のページも記録する。**これが無いと IndexNow に通知されない。**
+  // published-slugs.txt は出演者のスラッグしか持たないため、シリーズ・
+  // レーベル・同人・新着が増えても、増えたぶんを送る経路が無かった。
+  await writeFile(
+    path.join(publicDir, 'data/published-pages.txt'),
+    `${[...new Set(entries.filter((url) => !url.includes('/actress/')))].sort().join('\n')}\n`,
+    'utf8'
+  )
+
   // 次回のために、公開したURLを記録する。
   await writeFile(
     path.join(publicDir, 'data/published-slugs.txt'),
