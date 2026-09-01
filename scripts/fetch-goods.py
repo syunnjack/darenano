@@ -40,6 +40,8 @@ BASE = 'https://api.dmm.com/affiliate/v3'
 MAX_OFFSET = 50000
 WORKS_PER_MAKER = 12
 WORKS_PER_GENRE = 8
+# ジャンルページに出す下限。これ未満なら誤爆の可能性が高いので出さない
+MIN_PER_GENRE = 3
 NEWEST = 60
 PAUSE = 0.4
 
@@ -135,22 +137,44 @@ def sweep(cred: dict) -> tuple[dict, list, int]:
     return makers, newest, scanned
 
 
+def searchable(name: str) -> bool:
+    """キーワード検索に使ってよい名前か。
+
+    **keyword は本文にも当たる。**「OL」で引くと COOL や OIL の一部に
+    当たって「速乾スティック」が1位に出た（2026-09-01 実測）。
+    英数字だけの名前と、2文字未満の名前は使わない。
+    """
+    if len(name) < 3 and name.isascii():
+        return False
+    return not name.isascii()
+
+
 def by_genre(cred: dict, names: list) -> dict:
     """ジャンル名で商品を引く。**分類ではなく語で引いているだけ**なので、
-    ページにもその旨を書くこと。"""
+    題名にその語が入っているものだけを残す。ページにもその旨を書くこと。"""
     found = {}
 
     for name in names:
+        if not searchable(name):
+            print(f'  {name}: 語が短い／英数字なので引かない', file=sys.stderr)
+            continue
+
         payload = fetch(f'{BASE}/ItemList?' + urllib.parse.urlencode(dict(
             cred, output='json', site='FANZA', service='mono', floor='goods',
-            keyword=name, hits=WORKS_PER_GENRE, offset=1, sort='rank'))).get('result', {})
+            keyword=name, hits=60, offset=1, sort='rank'))).get('result', {})
 
         items = [compact(raw) for raw in (payload.get('items') or [])]
-        items = [item for item in items if item]
+        # **題名にその語が入っているものだけ**にする。本文への誤爆を落とす。
+        items = [item for item in items if item and name in item['t']]
 
-        if items:
-            found[name] = {'n': int(payload.get('total_count') or 0), 'w': items}
-            print(f'  {name}: {found[name]["n"]:,}件', file=sys.stderr)
+        if len(items) >= MIN_PER_GENRE:
+            found[name] = {'n': len(items), 'w': items[:WORKS_PER_GENRE],
+                           'hits': int(payload.get('total_count') or 0)}
+            print(f'  {name}: 題名に入っていたもの {len(items)}件'
+                  f'（検索の当たりは {payload.get("total_count")}件）', file=sys.stderr)
+        else:
+            print(f'  {name}: 題名に入っていたものが {len(items)}件しかないので出さない',
+                  file=sys.stderr)
 
         time.sleep(PAUSE)
 
