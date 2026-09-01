@@ -621,6 +621,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
           <a href="/new/">新着作品</a>
+          <a href="/doujin/">同人</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -1079,6 +1080,72 @@ function renderNewPage(works, confirmedOn) {
   })
 }
 
+const DOUJIN_KINDS = {
+  circle: { path: 'circle', nav: 'サークル別', unit: 'サークル' },
+  genre: { path: 'doujin', nav: '同人のジャンル別', unit: 'ジャンル' },
+}
+
+/** 同人の作品を表紙つきで並べる。画像もURLもAPIが返したものをそのまま使う。 */
+function renderDoujinWorks(works) {
+  if (!works?.length) return ''
+
+  return `<ul class="work-list">${works
+    .map((work) => `<li class="work"><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">`
+      + (work.i
+        ? `<img src="${escapeHtml(work.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="141" />`
+        : '')
+      + `<span class="work-title">${escapeHtml(work.t)}</span>`
+      + `<span class="work-meta">${escapeHtml(jpDate(work.d))}</span>`
+      + '</a></li>')
+    .join('')}</ul>`
+}
+
+/** 同人のサークル別・ジャンル別のページ。 */
+function renderDoujinPage(kind, entry, confirmedOn) {
+  const meta = DOUJIN_KINDS[kind]
+  const canonical = `${SITE_URL}/${meta.path}/${entry.id}/`
+  const description = `FANZA同人の${meta.unit}「${entry.name}」に${entry.n.toLocaleString('ja-JP')}作品が`
+    + `収録されています。新しい${entry.w.length}本を並べています。`
+
+  return shell({
+    title: `${entry.name}の同人作品｜${SITE_NAME}`,
+    description,
+    canonical,
+    crumbs: `<a href="/${meta.path}/">${escapeHtml(meta.nav)}</a> ＞ ${escapeHtml(entry.name)}`,
+    body: `
+      <h1>${escapeHtml(entry.name)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <section class="work-block">
+        <h2>収録作品<span class="pr">広告</span></h2>
+        ${renderDoujinWorks(entry.w)}
+      </section>
+      <section class="source-block">
+        <h2>出典</h2>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（同人）</a></li></ul>
+        <p class="confirmed">同人は作品に出演者が入らないため、${escapeHtml(meta.unit)}でまとめています。未成年を思わせるもの・同意のないもの・近親相姦・排泄を含む作品は載せていません。</p>
+      </section>`,
+  })
+}
+
+/** 同人の入口。 */
+function renderDoujinIndex(kind, entries, confirmedOn) {
+  const meta = DOUJIN_KINDS[kind]
+  const description = `FANZA同人の${meta.unit}のうち、収録作品の多い${entries.length.toLocaleString('ja-JP')}件を並べています。`
+
+  return shell({
+    title: `${meta.nav}（${entries.length.toLocaleString('ja-JP')}${meta.unit}）｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/${meta.path}/`,
+    crumbs: escapeHtml(meta.nav),
+    body: `
+      <h1>${escapeHtml(meta.nav)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <ul class="name-list">${entries
+        .map((entry) => `<li><a href="/${meta.path}/${entry.id}/">${escapeHtml(entry.name)}</a><span class="rank-count">${entry.n.toLocaleString('ja-JP')}作品</span></li>`)
+        .join('')}</ul>`,
+  })
+}
+
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
 <html lang="ja">
@@ -1109,6 +1176,7 @@ function shell({ title, description, canonical, crumbs, body }) {
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
           <a href="/new/">新着作品</a>
+          <a href="/doujin/">同人</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -1735,6 +1803,46 @@ async function main() {
     console.log('新着作品のデータが無いので、そのページは作りません。')
   }
 
+  // 同人。サークル別とジャンル別。人が入らないのでこの2軸になる。
+  const DOUJIN_MIN = { circle: 5, genre: 30 }
+  const doujinUrls = []
+
+  for (const [kind, file, key] of [
+    ['circle', 'doujin-circles.json', 'circles'],
+    ['genre', 'doujin-genres.json', 'genres'],
+  ]) {
+    let raw = null
+
+    try {
+      raw = (await readJson(path.join(dataDir, file)))[key] ?? {}
+    } catch {
+      console.log(`同人（${DOUJIN_KINDS[kind].nav}）のデータが無いので、そのページは作りません。`)
+      continue
+    }
+
+    const entries = Object.entries(raw)
+      .map(([id, value]) => ({ id, name: value.name, n: value.n ?? 0, w: value.w ?? [] }))
+      .filter((entry) => entry.n >= DOUJIN_MIN[kind] && entry.w.length > 0 && displayableName(entry.name))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+    const dir = path.join(publicDir, DOUJIN_KINDS[kind].path)
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+
+    for (const entry of entries) {
+      const target = path.join(dir, entry.id)
+      await mkdir(target, { recursive: true })
+      await writeFile(path.join(target, 'index.html'), renderDoujinPage(kind, entry, confirmedOn), 'utf8')
+      doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${entry.id}/`)
+    }
+
+    if (entries.length) {
+      await writeFile(path.join(dir, 'index.html'), renderDoujinIndex(kind, entries, confirmedOn), 'utf8')
+      doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/`)
+      console.log(`同人 ${DOUJIN_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`)
+    }
+  }
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -1795,6 +1903,7 @@ async function main() {
     ...genreList.map((g) => `${SITE_URL}/genre/${g.slug}/`),
     ...(hasNewPage ? [`${SITE_URL}/new/`] : []),
     ...groupUrls,
+    ...doujinUrls,
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
