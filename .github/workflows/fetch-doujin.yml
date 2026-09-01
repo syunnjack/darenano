@@ -1,0 +1,75 @@
+name: Fetch doujin
+
+# FANZA の同人を取り直す。
+#
+# iteminfo に人は入らず genre と maker（サークル）だけなので、
+# サークル別・ジャンル別のページになる。
+# offset の上限を超えるので、発売月で区切ってなめる。
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_month:
+        description: '取り始める月（YYYY-MM。空なら前回の続き）'
+        type: string
+        required: false
+      max_minutes:
+        description: '何分で打ち切るか'
+        type: string
+        default: '300'
+      reset:
+        description: '前回の結果を捨てて最初から取り直す'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 同人を取る
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          FROM_MONTH: ${{ inputs.from_month }}
+          MAX_MINUTES: ${{ inputs.max_minutes }}
+          RESET: ${{ inputs.reset && '1' || '' }}
+        run: python scripts/fetch-doujin.py
+
+      - name: 変化があれば commit する
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+          git commit -m "同人のデータを取り直す"
+          git pull --rebase --autostash origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
