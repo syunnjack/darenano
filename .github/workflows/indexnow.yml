@@ -46,15 +46,17 @@ jobs:
             # 以前は前者しか見ておらず、8,000ページ増えても1件も通知されなかった。
             : > new-urls.txt
 
+            # **grep は該当が無いと終了コード1を返す。** set -e と組み合わせると
+            # 「増えたURLが無かった」だけでジョブが落ちる。|| true で受ける。
             git diff HEAD~1 HEAD -- public/data/published-slugs.txt \
-              | grep '^+[^+]' | sed 's/^+//' \
+              | { grep '^+[^+]' || true; } | sed 's/^+//' \
               | while read -r slug; do
                   [ -n "$slug" ] && printf 'https://darekore.jp/actress/%s/\n' \
                     "$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$slug")"
                 done >> new-urls.txt
 
             git diff HEAD~1 HEAD -- public/data/published-pages.txt \
-              | grep '^+https://' | sed 's/^+//' >> new-urls.txt
+              | { grep '^+https://' || true; } | sed 's/^+//' >> new-urls.txt
 
             # ここも head でパイプを閉じないよう、ファイル経由で切る。
             head -10000 new-urls.txt > urls.txt
