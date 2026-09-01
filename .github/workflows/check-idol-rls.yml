@@ -1,0 +1,19 @@
+name: Check idol RLS
+
+# guradol.jp のテーブルを匿名キーで実際に触って、守りが効いているか見る。
+# 読み書きの試行だけで、既存のデータは壊さない。
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: main }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python scripts/check-idol-rls.py
