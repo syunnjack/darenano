@@ -378,6 +378,25 @@ function renderB10fWorks(works) {
     .join('')}</ul>`
 }
 
+/** 大人のおもちゃを並べる。リンクと画像はAPIが返したものをそのまま使う。
+ *
+ * **分類ではなく語で引いているだけ**なので、その旨をページに書く。
+ * 題名にその語が入っているものだけを残してある（本文への誤爆を落とすため）。
+ */
+function renderGoods(items) {
+  if (!items?.length) return ''
+
+  return `<ul class="work-list">${items
+    .map((item) => `<li class="work"><a href="${escapeHtml(item.u)}" target="_blank" rel="nofollow sponsored noopener">`
+      + (item.i
+        ? `<img src="${escapeHtml(item.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="100" />`
+        : '')
+      + `<span class="work-title">${escapeHtml(item.t)}</span>`
+      + (item.p ? `<span class="work-meta">${escapeHtml(item.p)}</span>` : '')
+      + '</a></li>')
+    .join('')}</ul>`
+}
+
 function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
@@ -816,6 +835,13 @@ function renderGenrePage(genre, rows, confirmedOn) {
             <h2>このジャンルの作品<span class="pr">広告</span></h2>
             ${renderWorkList(genre.fanzaWorks)}
             <p class="confirmed">FANZA の人気順で上位 ${genre.fanzaWorks.length} 本です。作品名は FANZA が公開している商品名をそのまま出しています。</p>
+          </section>`
+        : ''}
+      ${genre.goods?.w?.length
+        ? `<section class="work-block">
+            <h2>「${escapeHtml(genre.name)}」で見つかる大人のおもちゃ<span class="pr">広告</span></h2>
+            ${renderGoods(genre.goods.w)}
+            <p class="confirmed">FANZA の大人のおもちゃ 21,027件を「${escapeHtml(genre.name)}」で検索し、<strong>題名にその語が入っている商品だけ</strong>を出しています。作品のジャンル分類とは別のものです。</p>
           </section>`
         : ''}
       <h2>出演本数の多い方</h2>
@@ -1587,6 +1613,24 @@ async function main() {
     }
 
     const slugOf = new Map(targets.map((p) => [normaliseName(p.name), p.slug]))
+    // 大人のおもちゃ。ジャンル名で引いたものをジャンルページに出す。
+    try {
+      const goodsFile = await readJson(path.join(dataDir, 'fanza-goods.json'))
+      const byGenre = goodsFile.byGenre ?? {}
+      let attached = 0
+
+      for (const genre of genreList) {
+        const found = byGenre[genre.name]
+        if (!found) continue
+        genre.goods = found
+        attached += 1
+      }
+
+      console.log(`大人のおもちゃ: ${attached}ジャンルに足しました（商品 ${(goodsFile.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+    } catch {
+      console.log('大人のおもちゃのデータが無いので、そのぶんは足しません。')
+    }
+
     await rm(path.join(publicDir, 'genre'), { recursive: true, force: true })
 
     for (const genre of genreList) {
