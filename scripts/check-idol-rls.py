@@ -79,16 +79,25 @@ def main() -> int:
     status, _ = call('POST', 'rpc/approve_idol_review', {'review_id': 1})
     check('承認関数は呼べない', status not in (200, 204), f'HTTP {status}')
 
-    status, _ = call('PATCH', f'idol_reviews?slug=eq.{SLUG}', {'status': 'approved'},
-                     {'Prefer': 'return=minimal'})
-    check('書き換えられない', status not in (200, 204), f'HTTP {status}')
+    # **PostgREST は0行でも 204 を返す。** ステータスだけ見ると
+    # 「消せた」ように見えてしまう。return=representation で
+    # **実際に何行動いたか**を受け取って判定する。
+    def touched(method: str, path: str, body=None) -> tuple:
+        code, text = call(method, path, body, {'Prefer': 'return=representation'})
+        try:
+            rows = json.loads(text) if text.strip().startswith('[') else []
+        except Exception:
+            rows = []
+        return code, len(rows)
 
-    status, _ = call('DELETE', f'idol_reviews?slug=eq.{SLUG}', None,
-                     {'Prefer': 'return=minimal'})
-    check('消せない', status not in (200, 204), f'HTTP {status}')
+    status, moved = touched('PATCH', f'idol_reviews?slug=eq.{SLUG}', {'status': 'approved'})
+    check('書き換えられない', moved == 0, f'HTTP {status} / 動いた行 {moved}')
 
-    status, _ = call('DELETE', f'idol_votes?slug=eq.{SLUG}', None, {'Prefer': 'return=minimal'})
-    check('投票も消せない', status not in (200, 204), f'HTTP {status}')
+    status, moved = touched('DELETE', f'idol_reviews?slug=eq.{SLUG}')
+    check('消せない', moved == 0, f'HTTP {status} / 消えた行 {moved}')
+
+    status, moved = touched('DELETE', f'idol_votes?slug=eq.{SLUG}')
+    check('投票も消せない', moved == 0, f'HTTP {status} / 消えた行 {moved}')
 
     bad = results.count(False)
     print(f'\n{len(results)}項目中 {bad}件が危険です。' if bad else
