@@ -34,7 +34,8 @@ def main() -> int:
             for floor in service.get('floor') or []:
                 row = (site.get('name'), service.get('code'), floor.get('code'), floor.get('name'))
                 print('  %-10s %-12s %-16s %s' % row)
-                if floor.get('code') in ('videoa', 'idol', 'digital_doujin', 'videoc', 'anime', 'nikkatsu'):
+                if floor.get('code') in ('videoa', 'idol', 'digital_doujin', 'videoc', 'anime',
+                                         'goods', 'dvd', 'book', 'comic', 'pcgame', 'doujin'):
                     targets.append((site.get('code') or site.get('name'), service.get('code'), floor.get('code')))
 
     print('\n=== フロアごとの中身 ===')
