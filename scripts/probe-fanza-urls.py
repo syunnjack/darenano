@@ -13,11 +13,14 @@ import urllib.request
 
 BASE = 'https://api.dmm.com/affiliate/v3'
 FLOORS = [
-    ('digital', 'videoa', '動画'),
-    ('mono', 'dvd', 'DVD'),
-    ('monthly', 'premium', '見放題ch'),
-    ('ebook', 'photo', '写真集'),
-    ('digital', 'nikkatsu', '成人映画'),
+    ('mono', 'pcgame', 'PCゲーム'),
+    ('pcgame', 'digital_pcgame', 'アダルトPCゲーム'),
+    ('ebook', 'comic', 'コミック'),
+    ('ebook', 'novel', '美少女ノベル'),
+    ('mono', 'book', 'ブック'),
+    ('digital', 'videoc', '素人'),
+    ('digital', 'anime', 'アニメ動画'),
+    ('mono', 'figure', 'フィギュア'),
 ]
 
 
@@ -45,6 +48,11 @@ def main() -> int:
         print(f'  affiliate  : {str(item.get("affiliateURL"))[:110]}')
         images = item.get('imageURL') or {}
         print(f'  画像       : {str(images.get("list") or images.get("small"))[:100]}')
+        info = item.get('iteminfo') or {}
+        for key in ('author', 'actress', 'maker', 'genre', 'series'):
+            vals = info.get(key) or []
+            if vals:
+                print(f'  {key:<10} : ' + ' / '.join(str(v.get("name"))[:18] for v in vals[:3]))
         time.sleep(1.2)
 
     return 0
