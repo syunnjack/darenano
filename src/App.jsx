@@ -59,6 +59,8 @@ function App() {
   const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const [featured, setFeatured] = useState(null)
   const [genres, setGenres] = useState([])
+  // 作者ページを作っていないときにリンクを出すと404になる
+  const [hasAuthors, setHasAuthors] = useState(false)
   const [ranking, setRanking] = useState([])
   const { index, loading, load } = useSearchIndex()
 
@@ -93,7 +95,7 @@ function App() {
   useEffect(() => {
     fetch('/data/genre-index.json')
       .then((response) => response.json())
-      .then((file) => setGenres(file.genres ?? []))
+      .then((file) => { setGenres(file.genres ?? []); setHasAuthors(Boolean(file.hasAuthors)) })
       .catch(() => setGenres([]))
   }, [])
 
@@ -263,12 +265,14 @@ function App() {
                 メーカーで辿る。フッタのリンクだけでは辿り着けなかった。 */}
             <h2 className="side-head">別の探し方</h2>
             <ul className="other-ways">
-              <li>
-                <a href="/author/">
-                  <span className="way-name">作者から探す</span>
-                  <span className="way-note">コミック・ノベル・ゲーム</span>
-                </a>
-              </li>
+              {hasAuthors && (
+                <li>
+                  <a href="/author/">
+                    <span className="way-name">作者から探す</span>
+                    <span className="way-note">コミック・ノベル・ゲーム</span>
+                  </a>
+                </li>
+              )}
               <li>
                 <a href="/doujin/">
                   <span className="way-name">同人</span>

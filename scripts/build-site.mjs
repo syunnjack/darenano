@@ -804,7 +804,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
-          <a href="/author/">作者から探す</a>
+          ${hasAuthorPages ? '<a href="/author/">作者から探す</a>' : ''}
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
           <a href="/new/">新着作品</a>
@@ -1391,6 +1391,10 @@ function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn) {
   })
 }
 
+// 作者ページを作ったかどうか。**作っていないのにリンクを出すと404になる。**
+// 実際 /author/ へのリンクだけ先に出してしまい、本番で404を踏んだ。
+let hasAuthorPages = false
+
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
 <html lang="ja">
@@ -1420,7 +1424,7 @@ function shell({ title, description, canonical, crumbs, body }) {
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
-          <a href="/author/">作者から探す</a>
+          ${hasAuthorPages ? '<a href="/author/">作者から探す</a>' : ''}
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
           <a href="/new/">新着作品</a>
@@ -1985,7 +1989,8 @@ async function main() {
       path.join(publicDir, 'data/genre-index.json'),
       JSON.stringify({
         confirmedOn,
-        genres: genreList.map((g) => ({
+        hasAuthors: hasAuthorPages,
+      genres: genreList.map((g) => ({
           name: g.name,
           slug: g.slug,
           aka: g.aka ?? [],
@@ -2176,6 +2181,7 @@ async function main() {
       await writeFile(path.join(dir, 'index.html'),
         renderAuthorIndexPage(authors.slice(0, 2000), confirmedOn), 'utf8')
       authorUrls.push(`${SITE_URL}/author/`)
+      hasAuthorPages = true
       console.log(`作者: ${authors.length.toLocaleString('ja-JP')}ページ（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
     }
   } catch {
