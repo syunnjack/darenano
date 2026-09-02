@@ -49,6 +49,38 @@ function fanzaCover(cid) {
   return `https://pics.dmm.co.jp/digital/video/${cid}/${cid}ps.jpg`
 }
 
+// 動画以外のフロア。**作品URLの形がフロアごとに違う**（2026-09-02 実測）。
+// 写真集だけは品番から組み立てられないので、取得時に URL を持たせてある。
+const MORE_FLOORS = {
+  dvd: { label: 'DVD', url: (cid) => `https://www.dmm.co.jp/mono/dvd/-/detail/=/cid=${cid}/` },
+  monthly: { label: '見放題ch', url: (cid) => `https://www.dmm.co.jp/monthly/premium/-/detail/=/cid=${cid}/` },
+  cinema: { label: '成人映画', url: (cid) => `https://video.dmm.co.jp/cinema/content/?id=${cid}` },
+  photo: { label: '写真集', url: null },
+}
+
+/** 動画以外のフロアの作品を、表紙つきで並べる。 */
+function renderMoreWorks(kind, works) {
+  const floor = MORE_FLOORS[kind]
+  if (!floor || !works?.length) return ''
+
+  const items = works.map((work) => {
+    const target = floor.url ? floor.url(work.c) : (work.u || '')
+    if (!target) return ''
+
+    const cover = work.i
+      ? `<img src="${escapeHtml(work.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="145" />`
+      : ''
+
+    return `<li class="work"><a href="${escapeHtml(fanzaLink(target))}" target="_blank" rel="nofollow sponsored noopener">`
+      + cover
+      + `<span class="work-title">${escapeHtml(work.t)}</span>`
+      + `<span class="work-meta">${escapeHtml(jpDate(work.d))}</span>`
+      + '</a></li>'
+  }).join('')
+
+  return items ? `<ul class="work-list">${items}</ul>` : ''
+}
+
 // MGS動画の紹介コード。**空のときはリンクを出さない。**
 // リポジトリには書かず、GitHub Secrets の MGS_AFFILIATE_CODE から渡す。
 // MGS には作品データのAPIもCSVも無いため、作品単位のリンクは作れない。
@@ -397,7 +429,7 @@ function renderGoods(items) {
     .join('')}</ul>`
 }
 
-function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks }) {
+function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks, moreWorks }) {
   const canonical = `${SITE_URL}/actress/${person.slug}/`
   const reading = person.reading ? `（${person.reading}）` : ''
   const title = `${person.name}${reading}のプロフィール｜${SITE_NAME}`
@@ -501,6 +533,15 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       </section>`
     : ''
 
+  // 動画以外の FANZA。同じ出演者IDで引けるので、同じページに並べられる。
+  const moreHtml = Object.entries(moreWorks ?? {})
+    .filter(([kind, works]) => MORE_FLOORS[kind] && works?.length)
+    .map(([kind, works]) => `<section class="work-block">
+        <h2>FANZA ${escapeHtml(MORE_FLOORS[kind].label)}での出演作品<span class="pr">広告</span></h2>
+        ${renderMoreWorks(kind, works)}
+      </section>`)
+    .join('')
+
   // DUGA の出演作品。これまでは代表作品1本へのリンクだけだった。
   const dugaWorksHtml = person.duga?.recent?.length
     ? `<section class="work-block">
@@ -596,6 +637,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       <div class="lead-block">${photoHtml}${profileHtml}</div>
       ${worksHtml}
       ${fanzaWorksHtml}
+      ${moreHtml}
       ${dugaWorksHtml}
       ${sokmilWorksHtml}
       ${b10fWorksHtml}
@@ -1558,6 +1600,16 @@ async function main() {
     console.log('FANZA の作品データが無いので、出演作品は並べません。')
   }
 
+  // 動画以外のフロア（DVD・見放題ch・写真集・成人映画）。
+  let moreWorksOf = new Map()
+  try {
+    const file = await readJson(path.join(dataDir, 'fanza-actress-more.json'))
+    moreWorksOf = new Map(Object.entries(file.actresses ?? {}))
+    console.log(`FANZA の動画以外: ${moreWorksOf.size.toLocaleString('ja-JP')}人ぶん（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+  } catch {
+    console.log('FANZA の動画以外のデータが無いので、そのぶんは並べません。')
+  }
+
   // ソクミルの作品データ。
   let sokmilWorksOf = new Map()
   try {
@@ -1597,6 +1649,7 @@ async function main() {
       related,
       indexable: person.indexable,
       fanzaWorks: person.fanza?.dmmId ? fanzaWorksOf.get(String(person.fanza.dmmId)) : null,
+      moreWorks: person.fanza?.dmmId ? moreWorksOf.get(String(person.fanza.dmmId)) : null,
       sokmilWorks: person.sokmil?.sokmilId ? sokmilWorksOf.get(String(person.sokmil.sokmilId)) : null,
       dtiWorks: dtiWorksOf.get(normaliseName(person.name)) ?? null,
     })
