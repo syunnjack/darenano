@@ -121,6 +121,8 @@ function App() {
         <nav>
           <a href="/actress/">五十音索引</a>
           <a href="/genre/">ジャンル別</a>
+          <a href="/doujin/">同人</a>
+          <a href="/goods/">大人のおもちゃ</a>
           <a href="/ranking/">投票ランキング</a>
         </nav>
       </header>
@@ -256,6 +258,42 @@ function App() {
             <p className="more">
               <a href="/genre/">ジャンル別の一覧を見る</a>
             </p>
+
+            {/* 出演者名鑑とは別の軸。人が出てこないので、ジャンルとサークル、
+                メーカーで辿る。フッタのリンクだけでは辿り着けなかった。 */}
+            <h2 className="side-head">別の探し方</h2>
+            <ul className="other-ways">
+              <li>
+                <a href="/doujin/">
+                  <span className="way-name">同人</span>
+                  <span className="way-note">ジャンル別・サークル別</span>
+                </a>
+              </li>
+              <li>
+                <a href="/goods/">
+                  <span className="way-name">大人のおもちゃ</span>
+                  <span className="way-note">ジャンル別・メーカー別</span>
+                </a>
+              </li>
+              <li>
+                <a href="/series/">
+                  <span className="way-name">シリーズ別</span>
+                  <span className="way-note">同じシリーズの作品</span>
+                </a>
+              </li>
+              <li>
+                <a href="/label/">
+                  <span className="way-name">レーベル別</span>
+                  <span className="way-note">レーベルごとの作品</span>
+                </a>
+              </li>
+              <li>
+                <a href="/new/">
+                  <span className="way-name">新着作品</span>
+                  <span className="way-note">発売日の新しい順</span>
+                </a>
+              </li>
+            </ul>
           </aside>
         )}
       </div>
@@ -299,6 +337,8 @@ function App() {
         <nav aria-label="フッターナビ">
           <a href="/actress/">五十音索引</a>
           <a href="/genre/">ジャンル別</a>
+          <a href="/doujin/">同人</a>
+          <a href="/goods/">大人のおもちゃ</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
           <a href="mailto:info@darekore.jp">お問い合わせ</a>

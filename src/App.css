@@ -601,3 +601,20 @@
     padding: 14px;
   }
 }
+
+/* 出演者名鑑とは別の軸への入口（同人・おもちゃ・シリーズなど）。
+   フッタのリンクだけでは辿り着けなかったので、トップの目立つ位置に置く。 */
+.side-head { margin-top: 28px; }
+.other-ways { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.other-ways a {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 14px; border: 1px solid #ecdfe2; border-radius: 10px;
+  background: #fff; text-decoration: none; color: #3b3546;
+}
+.other-ways a:hover { border-color: #8b4054; }
+.way-name { font-weight: 700; font-size: 15px; }
+.way-note { font-size: 12px; color: #8a838f; margin-left: auto; }
+@media (prefers-color-scheme: dark) {
+  .other-ways a { background: #211e28; border-color: #332d3d; color: #ded8e6; }
+  .other-ways a:hover { border-color: #f0908a; }
+}

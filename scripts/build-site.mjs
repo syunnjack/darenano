@@ -620,8 +620,9 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
-          <a href="/new/">新着作品</a>
           <a href="/doujin/">同人</a>
+          <a href="/goods/">大人のおもちゃ</a>
+          <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -1146,6 +1147,64 @@ function renderDoujinIndex(kind, entries, confirmedOn) {
   })
 }
 
+/** 大人のおもちゃのメーカー別ページ。 */
+function renderGoodsMakerPage(maker, confirmedOn) {
+  const canonical = `${SITE_URL}/goods/${maker.id}/`
+  const description = `${maker.name}の大人のおもちゃ ${maker.n.toLocaleString('ja-JP')}件のうち、`
+    + `新しい${maker.w.length}件を並べています。`
+
+  return shell({
+    title: `${maker.name}の大人のおもちゃ｜${SITE_NAME}`,
+    description,
+    canonical,
+    crumbs: `<a href="/goods/">大人のおもちゃ</a> ＞ ${escapeHtml(maker.name)}`,
+    body: `
+      <h1>${escapeHtml(maker.name)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <section class="work-block">
+        <h2>取り扱い商品<span class="pr">広告</span></h2>
+        ${renderGoods(maker.w)}
+      </section>
+      <section class="source-block">
+        <h2>出典</h2>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（大人のおもちゃ）</a></li></ul>
+        <p class="confirmed">FANZA が公開している商品情報をそのまま出しています。価格・在庫は変わるため、最新の内容は販売ページでご確認ください。</p>
+      </section>`,
+  })
+}
+
+/** 大人のおもちゃの入口。ジャンルからも、メーカーからも辿れるようにする。 */
+function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn) {
+  const description = `FANZA の大人のおもちゃ ${scanned.toLocaleString('ja-JP')}件から、`
+    + `ジャンル ${genres.length}件・メーカー ${makers.length}社ぶんの入口を作っています。`
+
+  return shell({
+    title: `大人のおもちゃ（${scanned.toLocaleString('ja-JP')}商品）｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/goods/`,
+    crumbs: '大人のおもちゃ',
+    body: `
+      <h1>大人のおもちゃ</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      ${newest.length
+        ? `<section class="work-block">
+            <h2>新しく入った商品<span class="pr">広告</span></h2>
+            ${renderGoods(newest.slice(0, 12))}
+          </section>`
+        : ''}
+      ${genres.length
+        ? `<h2>ジャンルから探す</h2>
+           <div class="chips">${genres
+             .map((g) => `<a href="/genre/${escapeHtml(g.slug)}/">${escapeHtml(g.name)}<span class="rank-count">${g.count}</span></a>`)
+             .join('')}</div>`
+        : ''}
+      <h2>メーカーから探す</h2>
+      <ul class="name-list">${makers
+        .map((m) => `<li><a href="/goods/${m.id}/">${escapeHtml(m.name)}</a><span class="rank-count">${m.n.toLocaleString('ja-JP')}商品</span></li>`)
+        .join('')}</ul>`,
+  })
+}
+
 function shell({ title, description, canonical, crumbs, body }) {
   return `<!doctype html>
 <html lang="ja">
@@ -1175,8 +1234,9 @@ function shell({ title, description, canonical, crumbs, body }) {
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
-          <a href="/new/">新着作品</a>
           <a href="/doujin/">同人</a>
+          <a href="/goods/">大人のおもちゃ</a>
+          <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
         </nav>
@@ -1843,6 +1903,47 @@ async function main() {
     }
   }
 
+  // 大人のおもちゃ。メーカー別ページと入口。
+  // これまでジャンルページの中にしか無く、辿り着けなかった。
+  const GOODS_MIN_ITEMS = 30
+  const goodsUrls = []
+
+  try {
+    const goodsFile = await readJson(path.join(dataDir, 'fanza-goods.json'))
+
+    const makers = Object.entries(goodsFile.makers ?? {})
+      .map(([id, value]) => ({ id, name: value.name, n: value.n ?? 0, w: value.w ?? [] }))
+      .filter((m) => m.n >= GOODS_MIN_ITEMS && m.w.length > 0 && displayableName(m.name))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+    const dir = path.join(publicDir, 'goods')
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+
+    for (const maker of makers) {
+      const target = path.join(dir, maker.id)
+      await mkdir(target, { recursive: true })
+      await writeFile(path.join(target, 'index.html'), renderGoodsMakerPage(maker, confirmedOn), 'utf8')
+      goodsUrls.push(`${SITE_URL}/goods/${maker.id}/`)
+    }
+
+    // ジャンルからも入れるようにする。名前は genres.json の並びに合わせる。
+    const genreLinks = genreList
+      .filter((g) => g.goods?.w?.length)
+      .map((g) => ({ name: g.name, slug: g.slug, count: g.goods.w.length }))
+
+    await writeFile(
+      path.join(dir, 'index.html'),
+      renderGoodsIndexPage(makers, genreLinks, goodsFile.newest ?? [], goodsFile.scanned ?? 0, confirmedOn),
+      'utf8'
+    )
+    goodsUrls.push(`${SITE_URL}/goods/`)
+
+    console.log(`大人のおもちゃ: メーカー ${makers.length}ページ + 入口`)
+  } catch {
+    console.log('大人のおもちゃのデータが無いので、そのページは作りません。')
+  }
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -1904,6 +2005,7 @@ async function main() {
     ...(hasNewPage ? [`${SITE_URL}/new/`] : []),
     ...groupUrls,
     ...doujinUrls,
+    ...goodsUrls,
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
