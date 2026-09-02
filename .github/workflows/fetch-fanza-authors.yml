@@ -1,0 +1,75 @@
+name: Fetch FANZA authors
+
+# 作者名鑑のもと。コミック・ノベル・PCゲーム・ブックには author が入る。
+# 出演者名鑑と並ぶ、もう1つの軸。
+#
+# 発売月で区切って取り、途中で止まっても data/fanza-authors-state.json の
+# フロアごとの「次に取る月」から続きを取る。
+
+on:
+  workflow_dispatch:
+    inputs:
+      only_floor:
+        description: 'フロア（comic,novel,pcgame,monopcgame,book のうち。空なら全部）'
+        type: string
+        required: false
+      max_minutes:
+        description: '何分で打ち切るか'
+        type: string
+        default: '300'
+      reset:
+        description: '前回の結果を捨てて最初から'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 作者を取る
+        env:
+          FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          ONLY_FLOOR: ${{ inputs.only_floor }}
+          MAX_MINUTES: ${{ inputs.max_minutes }}
+          RESET: ${{ inputs.reset && '1' || '' }}
+        run: python scripts/fetch-fanza-authors.py
+
+      - name: 変化があれば commit する
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+          git commit -m "FANZA の作者データを取り直す"
+          git pull --rebase --autostash origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: fetch
+    if: needs.fetch.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
