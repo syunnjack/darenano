@@ -35,6 +35,47 @@ const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 // 「ダイレクト報酬」が構造的に発生しない状態だった。
 const FANZA_AFFILIATE_ID = process.env.FANZA_AFFILIATE_ID || 'syunnda1-997'
 
+// FANZA のバナー（ウィジェット）。ライブチャットやくじのように
+// ItemList API が無いサービスは、これでしか出せない。
+//
+// **アフィリエイトIDが作品リンクとは別**（-011 と -997）。
+// ウィジェット用に発行されたものなので、混ぜない。
+//
+// URL の & は &amp; と書く。素の & は実体参照として解釈されうる。
+const BANNER_AFFILIATE_ID = 'syunnda1-011'
+const BANNER_IDS = [
+  '1481_300_250', '1490_300_250', '1503_300_250', '1829_300_250',
+  '1987_300_250', '1988_300_250', '2026_300_250', '2029_300_250',
+  '2053_300_250', '2054_300_250', '2059_300_250',
+]
+
+/** ページごとに1枚だけ割り当てる。
+ *
+ * **1ページに何枚も並べない。** 広告だらけのページは読む人にも
+ * 検索エンジンにも嫌われる。ページの名前から決めるので、
+ * 同じページを開き直しても同じ広告が出る（毎回変わると落ち着かない）。
+ */
+function bannerFor(key) {
+  let hash = 0
+  for (const char of String(key ?? '')) {
+    hash = (hash * 31 + char.codePointAt(0)) % 100000
+  }
+
+  return BANNER_IDS[hash % BANNER_IDS.length]
+}
+
+/** バナーを、広告と分かる形で置く。 */
+function renderBanner(key) {
+  const bannerId = bannerFor(key)
+  const src = 'https://widget-view.dmm.co.jp/js/banner_placement.js'
+    + `?affiliate_id=${BANNER_AFFILIATE_ID}&amp;banner_id=${bannerId}`
+
+  return '<aside class="banner"><span class="pr">広告</span>'
+    + '<ins class="widget-banner"></ins>'
+    + `<script class="widget-banner-script" src="${src}"></script>`
+    + '</aside>'
+}
+
 // 作品ページ・表紙画像のURLは品番から組み立てられる。
 // 実際に叩いて確かめてある（旧 detail URL は content へ301する）。
 function fanzaLink(target) {
@@ -738,6 +779,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         <p class="confirmed">各サービスの API が公開している情報をそのまま載せています。取得時期は<a href="/actress/">五十音索引</a>に記載しています。</p>
       </section>
       ${historyHtml}
+      ${renderBanner(person.slug)}
       <section id="ugc" class="ugc"
                data-slug="${escapeHtml(person.slug)}"
                data-api="${escapeHtml(SUPABASE_URL)}"
@@ -979,6 +1021,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
             <p class="confirmed">FANZA の大人のおもちゃ 21,027件を「${escapeHtml(genre.name)}」で検索し、<strong>題名にその語が入っている商品だけ</strong>を出しています。作品のジャンル分類とは別のものです。</p>
           </section>`
         : ''}
+      ${renderBanner(genre.slug)}
       <h2>出演本数の多い方</h2>
       <ol class="rank-list">${list}</ol>
       <script type="application/ld+json">${JSON.stringify({
@@ -1422,6 +1465,9 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .work-lines a { color:#3b3546; text-decoration:none; }
 .work-lines a:hover { color:#8b4054; text-decoration:underline; }
 .work-lines .work-meta { display:block; }
+.banner { display:flex; flex-direction:column; align-items:center; gap:6px; margin:28px 0; }
+.banner .pr { align-self:flex-start; }
+.banner ins { display:block; max-width:100%; }
 .source-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
