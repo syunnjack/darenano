@@ -264,6 +264,12 @@ function App() {
             <h2 className="side-head">別の探し方</h2>
             <ul className="other-ways">
               <li>
+                <a href="/author/">
+                  <span className="way-name">作者から探す</span>
+                  <span className="way-note">コミック・ノベル・ゲーム</span>
+                </a>
+              </li>
+              <li>
                 <a href="/doujin/">
                   <span className="way-name">同人</span>
                   <span className="way-note">ジャンル別・サークル別</span>

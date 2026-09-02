@@ -58,6 +58,96 @@ const MORE_FLOORS = {
   photo: { label: '写真集', url: null },
 }
 
+// 作者が入るフロア。**URLの形がフロアごとに違う**（2026-09-02 実測）。
+// コミックとノベルだけは品番から組み立てられないので、取得時にURLを持たせてある。
+const AUTHOR_FLOORS = {
+  comic: { label: 'コミック', url: null },
+  novel: { label: '美少女ノベル', url: null },
+  pcgame: { label: 'アダルトPCゲーム', url: (cid) => `https://dlsoft.dmm.co.jp/detail/${cid}/` },
+  monopcgame: { label: 'PCゲーム', url: (cid) => `https://www.dmm.co.jp/mono/pcgame/-/detail/=/cid=${cid}/` },
+  book: { label: 'ブック', url: (cid) => `https://www.dmm.co.jp/mono/book/-/detail/=/cid=${cid}/` },
+}
+
+/** 作者の作品を、表紙つきで並べる。 */
+function renderAuthorWorks(kind, works) {
+  const floor = AUTHOR_FLOORS[kind]
+  if (!floor || !works?.length) return ''
+
+  const items = works.map((work) => {
+    const target = floor.url ? floor.url(work.c) : (work.u || '')
+    if (!target) return ''
+
+    const cover = work.i
+      ? `<img src="${escapeHtml(work.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="145" />`
+      : ''
+
+    return `<li class="work"><a href="${escapeHtml(fanzaLink(target))}" target="_blank" rel="nofollow sponsored noopener">`
+      + cover
+      + `<span class="work-title">${escapeHtml(work.t)}</span>`
+      + `<span class="work-meta">${escapeHtml(jpDate(work.d))}</span>`
+      + '</a></li>'
+  }).join('')
+
+  return items ? `<ul class="work-list">${items}</ul>` : ''
+}
+
+/** 作者ページ。出演者ページと同じ作りで、分野ごとに作品を並べる。 */
+function renderAuthorPage(author, confirmedOn) {
+  const canonical = `${SITE_URL}/author/${author.id}/`
+  const kinds = Object.keys(author.w ?? {}).filter((k) => AUTHOR_FLOORS[k] && author.w[k]?.length)
+  const fields = kinds.map((k) => AUTHOR_FLOORS[k].label).join('・')
+
+  const description = `${author.name}さんの作品${author.n.toLocaleString('ja-JP')}件を、`
+    + `FANZA が公開しているデータからまとめています。`
+    + (fields ? `分野は${fields}。` : '')
+
+  const blocks = kinds.map((kind) => `<section class="work-block">
+      <h2>${escapeHtml(AUTHOR_FLOORS[kind].label)}<span class="pr">広告</span></h2>
+      ${renderAuthorWorks(kind, author.w[kind])}
+    </section>`).join('')
+
+  return shell({
+    title: `${author.name}の作品｜${SITE_NAME}`,
+    description,
+    canonical,
+    crumbs: `<a href="/author/">作者から探す</a> ＞ ${escapeHtml(author.name)}`,
+    body: `
+      <h1>${escapeHtml(author.name)}</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      ${blocks}
+      <section class="source-block">
+        <h2>出典</h2>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（ItemList）</a>（作者ID ${escapeHtml(author.id)}）</li></ul>
+        <p class="confirmed">FANZA が作品に付けている作者名をそのまま数えたものです。実在の方なので、確認できない経歴や評価は書いていません。</p>
+      </section>
+      <script type="application/ld+json">${jsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: author.name,
+        url: canonical,
+      })}</script>`,
+  })
+}
+
+/** 作者の入口。 */
+function renderAuthorIndexPage(authors, confirmedOn) {
+  const description = `FANZA のコミック・ノベル・PCゲーム・ブックから、`
+    + `作品の多い作者 ${authors.length.toLocaleString('ja-JP')}人を並べています。`
+
+  return shell({
+    title: `作者から探す（${authors.length.toLocaleString('ja-JP')}人）｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/author/`,
+    crumbs: '作者から探す',
+    body: `
+      <h1>作者から探す</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <ul class="name-list">${authors
+        .map((a) => `<li><a href="/author/${a.id}/">${escapeHtml(a.name)}</a><span class="rank-count">${a.n.toLocaleString('ja-JP')}作品</span></li>`)
+        .join('')}</ul>`,
+  })
+}
+
 /** 動画以外のフロアの作品を、表紙つきで並べる。 */
 function renderMoreWorks(kind, works) {
   const floor = MORE_FLOORS[kind]
@@ -662,6 +752,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
+          <a href="/author/">作者から探す</a>
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
           <a href="/new/">新着作品</a>
@@ -1276,6 +1367,7 @@ function shell({ title, description, canonical, crumbs, body }) {
           <a href="/genre/">ジャンル別</a>
           <a href="/series/">シリーズ別</a>
           <a href="/label/">レーベル別</a>
+          <a href="/author/">作者から探す</a>
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
           <a href="/new/">新着作品</a>
@@ -1997,6 +2089,43 @@ async function main() {
     console.log('大人のおもちゃのデータが無いので、そのページは作りません。')
   }
 
+  // 作者名鑑。出演者名鑑と並ぶもう1つの軸。
+  // **1〜2作品の作者はページにしない**（薄いページを増やさないため）。
+  const AUTHOR_MIN_WORKS = 3
+  const authorUrls = []
+
+  try {
+    const file = await readJson(path.join(dataDir, 'fanza-authors.json'))
+
+    const authors = Object.entries(file.authors ?? {})
+      .map(([id, value]) => ({ id, name: value.name, n: value.n ?? 0, w: value.w ?? {} }))
+      .filter((a) => a.n >= AUTHOR_MIN_WORKS
+        && Object.values(a.w).some((works) => works?.length)
+        && displayableName(a.name))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+    const dir = path.join(publicDir, 'author')
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+
+    for (const author of authors) {
+      const target = path.join(dir, author.id)
+      await mkdir(target, { recursive: true })
+      await writeFile(path.join(target, 'index.html'), renderAuthorPage(author, confirmedOn), 'utf8')
+      authorUrls.push(`${SITE_URL}/author/${author.id}/`)
+    }
+
+    if (authors.length) {
+      // 入口が長くなりすぎないよう、多い順に上位だけ並べる
+      await writeFile(path.join(dir, 'index.html'),
+        renderAuthorIndexPage(authors.slice(0, 2000), confirmedOn), 'utf8')
+      authorUrls.push(`${SITE_URL}/author/`)
+      console.log(`作者: ${authors.length.toLocaleString('ja-JP')}ページ（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
+    }
+  } catch {
+    console.log('作者のデータが無いので、作者ページは作りません。')
+  }
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -2059,6 +2188,7 @@ async function main() {
     ...groupUrls,
     ...doujinUrls,
     ...goodsUrls,
+    ...authorUrls,
     `${SITE_URL}/privacy/`,
     ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
