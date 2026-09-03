@@ -133,6 +133,7 @@ function App() {
           <a href="/genre/">ジャンル別</a>
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
+          <a href="/fanza/">FANZAのサービス</a>
           <a href="/ranking/">投票ランキング</a>
         </nav>
       </header>
@@ -378,6 +379,7 @@ function App() {
           <a href="/genre/">ジャンル別</a>
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
+          <a href="/fanza/">FANZAのサービス</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
           <a href="mailto:info@darekore.jp">お問い合わせ</a>

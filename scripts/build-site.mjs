@@ -240,6 +240,90 @@ function renderAuthorIndexPage(authors, confirmedOn) {
   })
 }
 
+/**
+ * フロア別の入口。**FANZA のサービスごとに辿れる道を作る。**
+ *
+ * これまで作者ページ（/author/）に5フロアを混ぜて並べていたので、
+ * 「PCゲームだけ見たい」「コミックだけ見たい」という辿り方ができなかった。
+ * データは fanza-authors.json をそのまま使う（取り直しは要らない）。
+ */
+function renderFloorIndexPage(kind, authors, newest, confirmedOn, page = 1, pages = 1) {
+  const floor = AUTHOR_FLOORS[kind]
+  const shown = authors.slice((page - 1) * GROUP_PER_PAGE, page * GROUP_PER_PAGE)
+  const at = (n) => `/${kind}/${n === 1 ? '' : `${n}/`}`
+  const total = authors.reduce((sum, a) => sum + a.n, 0)
+
+  const description = `FANZA の${floor.label}から、作品のある作者${authors.length.toLocaleString('ja-JP')}人を`
+    + `作品の多い順に並べています。`
+    + (pages > 1 ? `このページは${page}／${pages}ページ目です。` : '')
+
+  const list = shown
+    .map((a) => `<li><a href="/author/${a.id}/">${escapeHtml(a.name)}</a><span class="rank-count">${a.n.toLocaleString('ja-JP')}作品</span></li>`)
+    .join('')
+
+  const pager = pages > 1
+    ? `<nav class="kana-nav pager">${Array.from({ length: pages }, (_, i) => i + 1)
+        .map((n) => (n === page
+          ? `<span class="current">${n}</span>`
+          : `<a href="${at(n)}">${n}</a>`))
+        .join('')}</nav>`
+    : ''
+
+  return shell({
+    title: `${floor.label}の作者から探す（${authors.length.toLocaleString('ja-JP')}人）`
+      + `${pages > 1 ? `${page}ページ目` : ''}｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}${at(page)}`,
+    crumbs: `<a href="/fanza/">FANZAのサービス</a> ＞ ${escapeHtml(floor.label)}`,
+    body: `
+      <h1>${escapeHtml(floor.label)}の作者から探す</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <p class="confirmed">FANZA が作品に付けている作者名をそのまま数えたものです。
+        この${escapeHtml(floor.label)}で数えた作品は${total.toLocaleString('ja-JP')}件です。</p>
+      ${page === 1 && newest.length ? `<h2>新しい作品</h2>${renderAuthorWorks(kind, newest)}` : ''}
+      <h2>作者</h2>
+      <ul class="name-list">${list}</ul>
+      ${pager}`,
+  })
+}
+
+/**
+ * FANZA のサービス一覧。**入口をひとまとめにする。**
+ *
+ * 動画・DVD・見放題ch・写真集・成人映画・同人・コミック・ノベル・
+ * PCゲーム・ブック・大人のおもちゃ・ライブチャット・くじ。
+ * 当サイトにページがあるものはそこへ、無いもの（ライブチャット・くじ）は
+ * FANZA の入口へ送る。
+ */
+function renderFanzaHubPage(rows, confirmedOn) {
+  const description = 'FANZA のサービスごとに、当サイトのどこから辿れるかをまとめています。'
+
+  const list = rows
+    .map((row) => `
+      <li>
+        <a href="${escapeHtml(row.href)}"${row.external ? ' target="_blank" rel="nofollow sponsored noopener"' : ''}>${escapeHtml(row.name)}</a>
+        <span class="service-note">${escapeHtml(row.note)}</span>
+        ${row.external ? '<span class="pr">広告</span>' : ''}
+      </li>`)
+    .join('')
+
+  return shell({
+    title: `FANZA のサービスから探す｜${SITE_NAME}`,
+    description,
+    canonical: `${SITE_URL}/fanza/`,
+    crumbs: 'FANZAのサービス',
+    // このページ自体が案内なので、下の「FANZAの他のサービス」は出さない。
+    hideServices: true,
+    body: `
+      <h1>FANZA のサービスから探す</h1>
+      <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      <p class="confirmed">出演者・作者・サークルは当サイトにページがあります。
+        ライブチャットとオンラインくじは、作品の一覧を出す仕組みが公開されていないため、
+        FANZA の入口へご案内します（広告）。</p>
+      <ul class="name-list service-list">${list}</ul>`,
+  })
+}
+
 /** 動画以外のフロアの作品を、表紙つきで並べる。 */
 function renderMoreWorks(kind, works) {
   const floor = MORE_FLOORS[kind]
@@ -855,6 +939,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
           ${hasAuthorPages ? '<a href="/author/">作者から探す</a>' : ''}
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
+          <a href="/fanza/">FANZAのサービス</a>
           <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
@@ -1527,7 +1612,7 @@ function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn) {
 // 実際 /author/ へのリンクだけ先に出してしまい、本番で404を踏んだ。
 let hasAuthorPages = false
 
-function shell({ title, description, canonical, crumbs, body, noindex = false }) {
+function shell({ title, description, canonical, crumbs, body, noindex = false, hideServices = false }) {
   return `<!doctype html>
 <html lang="ja">
   <head>
@@ -1548,7 +1633,7 @@ function shell({ title, description, canonical, crumbs, body, noindex = false })
       <header class="site-head"><a class="site-name" href="/">${escapeHtml(SITE_NAME)}</a></header>
       <nav class="crumbs"><a href="/">${escapeHtml(SITE_NAME)}</a> ＞ ${crumbs}</nav>
       ${body}
-      ${renderFanzaServices()}
+      ${hideServices ? '' : renderFanzaServices()}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
@@ -1561,6 +1646,7 @@ function shell({ title, description, canonical, crumbs, body, noindex = false })
           ${hasAuthorPages ? '<a href="/author/">作者から探す</a>' : ''}
           <a href="/doujin/">同人</a>
           <a href="/goods/">大人のおもちゃ</a>
+          <a href="/fanza/">FANZAのサービス</a>
           <a href="/new/">新着作品</a>
           <a href="/ranking/">投票ランキング</a>
           <a href="/privacy/">プライバシーポリシー</a>
@@ -2403,6 +2489,79 @@ async function main() {
     console.log('作者のデータが無いので、作者ページは作りません。')
   }
 
+  // フロア別の入口。**同じデータを、サービスごとに辿れるようにする。**
+  // これまで /author/ に5フロアを混ぜていたので、「PCゲームだけ」
+  // 「コミックだけ」という探し方ができなかった。
+  const floorUrls = []
+  const floorRows = []
+
+  try {
+    const file = await readJson(path.join(dataDir, 'fanza-authors.json'))
+    const all = Object.entries(file.authors ?? {})
+      .map(([id, value]) => ({ id, name: value.name, w: value.w ?? {} }))
+      .filter((a) => displayableName(a.name))
+
+    for (const kind of Object.keys(AUTHOR_FLOORS)) {
+      // このフロアに作品がある作者だけ。数はこのフロアぶんで数え直す。
+      const authors = all
+        .map((a) => ({ id: a.id, name: a.name, n: (a.w[kind] ?? []).length, w: a.w[kind] ?? [] }))
+        .filter((a) => a.n > 0)
+        .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+      if (authors.length < 50) continue
+
+      // 新着。**同じ作品を二度出さない**（複数の作者が付いていることがある）。
+      const seen = new Set()
+      const newest = authors
+        .flatMap((a) => a.w)
+        .filter((work) => (seen.has(work.c) ? false : seen.add(work.c)))
+        .sort((a, b) => String(b.d).localeCompare(String(a.d)))
+        .slice(0, 12)
+
+      const dir = path.join(publicDir, kind)
+      await rm(dir, { recursive: true, force: true })
+      const pages = Math.max(1, Math.ceil(authors.length / GROUP_PER_PAGE))
+
+      for (let page = 1; page <= pages; page += 1) {
+        const target = page === 1 ? dir : path.join(dir, String(page))
+        await mkdir(target, { recursive: true })
+        await writeFile(path.join(target, 'index.html'),
+          renderFloorIndexPage(kind, authors, newest, confirmedOn, page, pages), 'utf8')
+        floorUrls.push(`${SITE_URL}/${kind}/${page === 1 ? '' : `${page}/`}`)
+      }
+
+      floorRows.push({
+        name: AUTHOR_FLOORS[kind].label,
+        href: `/${kind}/`,
+        note: `作者${authors.length.toLocaleString('ja-JP')}人`,
+      })
+      console.log(`${AUTHOR_FLOORS[kind].label}: 作者 ${authors.length.toLocaleString('ja-JP')}人（入口 ${pages}ページ）`)
+    }
+  } catch {
+    console.log('作者のデータが無いので、フロア別の入口は作りません。')
+  }
+
+  // FANZA のサービス一覧。**入口をひとまとめにする。**
+  const hubRows = [
+    { name: '動画・DVD・見放題ch・写真集・成人映画', href: '/actress/', note: '出演者から探す' },
+    { name: 'ジャンル', href: '/genre/', note: '各社のジャンルから探す' },
+    { name: 'シリーズ', href: '/series/', note: 'シリーズから探す' },
+    { name: 'レーベル', href: '/label/', note: 'レーベルから探す' },
+    { name: '同人', href: '/circle/', note: 'サークルから探す' },
+    ...floorRows,
+    { name: '大人のおもちゃ', href: '/goods/', note: 'メーカーから探す' },
+    ...FANZA_SERVICES.map((service) => ({
+      name: service.name, href: fanzaLink(service.url), note: service.note, external: true,
+    })),
+  ]
+
+  const fanzaDir = path.join(publicDir, 'fanza')
+  await mkdir(fanzaDir, { recursive: true })
+  await writeFile(path.join(fanzaDir, 'index.html'),
+    renderFanzaHubPage(hubRows, confirmedOn), 'utf8')
+  floorUrls.push(`${SITE_URL}/fanza/`)
+  console.log(`FANZAのサービス一覧: ${hubRows.length}件`)
+
   // 検索用の索引。JSON より軽いので TSV にする。
   // スラッグは名前から作れる（ブラウザ側でも同じ処理をする）。
   // 名前どおりにならなかったときだけ3列目に書く。3MB → 1.9MB になる。
@@ -2466,6 +2625,7 @@ async function main() {
     ...doujinUrls,
     ...goodsUrls,
     ...authorUrls,
+    ...floorUrls,
     `${SITE_URL}/privacy/`,
     ...kanaUrls,
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
@@ -2481,7 +2641,8 @@ async function main() {
   const sectionOf = (url) => {
     const rest = url.slice(`${SITE_URL}/`.length)
     const head = rest.split('/')[0]
-    return ['actress', 'circle', 'author', 'series', 'label', 'doujin', 'genre', 'goods', 'kana']
+    return ['actress', 'circle', 'author', 'series', 'label', 'doujin', 'genre', 'goods', 'kana',
+      'comic', 'novel', 'pcgame', 'monopcgame', 'book', 'fanza']
       .includes(head) ? head : 'main'
   }
 

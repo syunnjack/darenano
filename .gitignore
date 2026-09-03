@@ -16,6 +16,13 @@ public/doujin/
 public/circle/
 public/goods/
 public/author/
+# FANZA のフロア別の入口（作者データから生成する）
+public/comic/
+public/novel/
+public/pcgame/
+public/monopcgame/
+public/book/
+public/fanza/
 public/ranking/index.html
 public/data/search-index.tsv
 public/data/featured.json
