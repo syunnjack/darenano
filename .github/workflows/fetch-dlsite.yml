@@ -1,0 +1,66 @@
+name: Fetch DLsite
+
+# DLsite の同人作品を集める。
+#
+# 手元で裏に流すと途中で止まるので、こちらで回す。
+# **スクリプトは途中から再開できる**（data/dlsite-state.json に
+# 次のページ番号と、見た作品の番号を残している）ので、
+# 何回かに分けて流してよい。
+#
+# 認証は要らない（一覧・作品情報・サークル名とも公開されている）。
+# affiliate_deny が立っている作品はスクリプト側で捨てている。
+
+on:
+  schedule:
+    - cron: '0 19 1 * *'   # 毎月1日 04:00 JST
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: '一覧を何ページ見るか（1ページ約100作品）'
+        type: string
+        default: '300'
+      minutes:
+        description: '何分で切り上げるか'
+        type: string
+        default: '300'
+      reset:
+        description: '前回の結果を捨てて最初から'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: DLsite の作品を集める
+        env:
+          MAX_PAGES: ${{ inputs.pages || '300' }}
+          MAX_MINUTES: ${{ inputs.minutes || '300' }}
+          RESET: ${{ inputs.reset && '1' || '' }}
+          PYTHONIOENCODING: utf-8
+        run: python scripts/fetch-dlsite.py
+
+      - name: 変化があれば commit する
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/dlsite-works.json data/dlsite-state.json
+
+          if git diff --cached --quiet; then
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+
+          circles=$(python -c "import io,json;print(len(json.load(io.open('data/dlsite-works.json',encoding='utf-8'))['circles']))")
+          git commit -m "DLsite の作品を取り直す（サークル ${circles}件）"
+          git pull --rebase --autostash origin main
+          git push
