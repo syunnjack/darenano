@@ -184,6 +184,28 @@ function App() {
           <p className="more">
             <a href="/genre/">ジャンル別の一覧を見る</a>
           </p>
+
+          {/* 名前とジャンル以外の探し方。**サイドバーは廃止した。**
+              右に置くと広い画面では右端、狭い画面では本文の下に回って
+              見つけられない。ジャンルと同じ帯にまとめる。 */}
+          <h2 className="ways-head">ジャンル以外から探す</h2>
+        <ul className="other-ways">
+          <li><a href="/actress/"><span className="way-name">五十音索引</span><span className="way-note">読みの頭文字から</span></a></li>
+          <li><a href="/series/"><span className="way-name">シリーズ別</span><span className="way-note">同じシリーズの作品</span></a></li>
+          <li><a href="/label/"><span className="way-name">レーベル別</span><span className="way-note">レーベルごとの作品</span></a></li>
+          <li><a href="/circle/"><span className="way-name">同人サークル別</span><span className="way-note">サークルごとの作品</span></a></li>
+          <li><a href="/doujin/"><span className="way-name">同人ジャンル別</span><span className="way-note">同人のジャンルから</span></a></li>
+          {hasAuthors && (
+            <li><a href="/author/"><span className="way-name">作者から探す</span><span className="way-note">コミック・ノベル・ゲーム</span></a></li>
+          )}
+          <li><a href="/comic/"><span className="way-name">コミック</span><span className="way-note">作者から</span></a></li>
+          <li><a href="/book/"><span className="way-name">ブック</span><span className="way-note">作者から</span></a></li>
+          <li><a href="/pcgame/"><span className="way-name">アダルトPCゲーム</span><span className="way-note">作者から</span></a></li>
+          <li><a href="/novel/"><span className="way-name">美少女ノベル</span><span className="way-note">作者から</span></a></li>
+          <li><a href="/goods/"><span className="way-name">大人のおもちゃ</span><span className="way-note">メーカーから</span></a></li>
+          <li><a href="/new/"><span className="way-name">新着作品</span><span className="way-note">発売日の新しい順</span></a></li>
+          <li><a href="/fanza/"><span className="way-name">FANZAのサービス</span><span className="way-note">サービスごとの入口</span></a></li>
+        </ul>
         </section>
       )}
       {!searching && ranking.length > 0 && (
@@ -213,8 +235,6 @@ function App() {
         </section>
       )}
 
-      <div className="layout">
-        <div className="column-main">
       {searching && (
         <section className="results" aria-live="polite">
           <h2>
@@ -270,56 +290,8 @@ function App() {
 
 
 
-        </div>
 
-        {/* ジャンルは検索窓のすぐ下へ移した（下の genres-band）。
-            ここには残りの探し方だけを置く。 */}
-        <aside className="column-side" aria-label="別の探し方">
-            {/* 出演者名鑑とは別の軸。人が出てこないので、ジャンルとサークル、
-                メーカーで辿る。フッタのリンクだけでは辿り着けなかった。 */}
-            <h2 className="side-head">別の探し方</h2>
-            <ul className="other-ways">
-              {hasAuthors && (
-                <li>
-                  <a href="/author/">
-                    <span className="way-name">作者から探す</span>
-                    <span className="way-note">コミック・ノベル・ゲーム</span>
-                  </a>
-                </li>
-              )}
-              <li>
-                <a href="/doujin/">
-                  <span className="way-name">同人</span>
-                  <span className="way-note">ジャンル別・サークル別</span>
-                </a>
-              </li>
-              <li>
-                <a href="/goods/">
-                  <span className="way-name">大人のおもちゃ</span>
-                  <span className="way-note">ジャンル別・メーカー別</span>
-                </a>
-              </li>
-              <li>
-                <a href="/series/">
-                  <span className="way-name">シリーズ別</span>
-                  <span className="way-note">同じシリーズの作品</span>
-                </a>
-              </li>
-              <li>
-                <a href="/label/">
-                  <span className="way-name">レーベル別</span>
-                  <span className="way-note">レーベルごとの作品</span>
-                </a>
-              </li>
-              <li>
-                <a href="/new/">
-                  <span className="way-name">新着作品</span>
-                  <span className="way-note">発売日の新しい順</span>
-                </a>
-              </li>
-            </ul>
-        </aside>
-      </div>
+
 
       <section className="about">
         <h2>このサイトについて</h2>

@@ -368,48 +368,13 @@
 }
 
 
-/* 本文とジャンルの2段組み。狭い画面では縦に積む。 */
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 32px;
-  align-items: start;
-}
-
+/* **2段組みは廃止した。** ジャンルと「別の探し方」を右のサイドに
+   置いていたが、広い画面では右端、狭い画面では本文をすべて読んだ
+   下に出るため見つけられなかった。いまは検索窓の下の帯に一本化している。 */
 @media (min-width: 900px) {
   .site {
     max-width: 1120px;
   }
-
-  .layout {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 40px;
-  }
-
-  /* 本文を読み進めても、ジャンルが見えたままになる。 */
-  .column-side {
-    position: sticky;
-    top: 16px;
-    max-height: calc(100svh - 32px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-
-/* ジャンルから探す */
-.column-side {
-  padding: 18px;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-}
-
-.column-side h2 {
-  font-size: 17px;
-  margin: 0 0 6px;
-  padding-left: 10px;
-  border-left: 4px solid var(--accent);
 }
 
 /* ジャンルから探す。検索窓のすぐ下に置く帯。
@@ -446,13 +411,6 @@
 }
 
 @media (min-width: 900px) {
-  /* **サイドに置いたときだけ**1列に積む。
-     検索窓の下の帯（.genres-band）では横に並べたいので、
-     .column-side の中に限定する。 */
-  .column-side .genre-chips {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
 }
 
 .genre-chips a {
@@ -667,15 +625,13 @@
     margin-left: 38px;
   }
 
-  .column-side {
-    padding: 14px;
-  }
 }
 
 /* 出演者名鑑とは別の軸への入口（同人・おもちゃ・シリーズなど）。
    フッタのリンクだけでは辿り着けなかったので、トップの目立つ位置に置く。 */
-.side-head { margin-top: 28px; }
-.other-ways { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.ways-head { font-size: 17px; margin: 26px 0 6px; padding-left: 10px; border-left: 4px solid var(--accent); }
+.other-ways { list-style: none; padding: 0; margin: 10px 0 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
 .other-ways a {
   display: flex; align-items: baseline; gap: 10px;
   padding: 10px 14px; border: 1px solid #ecdfe2; border-radius: 10px;
