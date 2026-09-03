@@ -162,6 +162,30 @@ function App() {
         </form>
       </section>
 
+      {/* ジャンルから探す。**右のサイドに置いていて見つけられない**と
+          言われたので、検索窓のすぐ下、投票ランキングの手前へ移した。 */}
+      {genres.length > 0 && (
+        <section className="genres-band" aria-label="ジャンルから探す">
+          <h2>ジャンルから探す</h2>
+          <p className="genres-lead">
+            FANZA・DUGA・ソクミル・B10F が作品に付けているジャンルごとに、
+            出演本数の多い方を並べています。
+          </p>
+          <ul className="genre-chips">
+            {genres.map((genre) => (
+              <li key={genre.slug}>
+                <a href={`/genre/${genre.slug}/`}>
+                  <span className="genre-name">{genre.name}</span>
+                  <span className="genre-count">{genre.people.toLocaleString('ja-JP')}人</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="more">
+            <a href="/genre/">ジャンル別の一覧を見る</a>
+          </p>
+        </section>
+      )}
       {!searching && ranking.length > 0 && (
         <section className="ranking-strip" aria-label="投票ランキング">
           <div className="ranking-head">
@@ -248,28 +272,9 @@ function App() {
 
         </div>
 
-        {/* ジャンルの一覧。広い画面では右側に置き、狭い画面では本文の下へ回る。 */}
-        {genres.length > 0 && (
-          <aside className="column-side" aria-label="ジャンルから探す">
-            <h2>ジャンルから探す</h2>
-            <p className="genres-lead">
-              FANZA・DUGA・ソクミル・B10F が作品に付けているジャンルごとに、
-              出演本数の多い方を並べています。
-            </p>
-            <ul className="genre-chips">
-              {genres.map((genre) => (
-                <li key={genre.slug}>
-                  <a href={`/genre/${genre.slug}/`}>
-                    <span className="genre-name">{genre.name}</span>
-                    <span className="genre-count">{genre.people.toLocaleString('ja-JP')}人</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className="more">
-              <a href="/genre/">ジャンル別の一覧を見る</a>
-            </p>
-
+        {/* ジャンルは検索窓のすぐ下へ移した（下の genres-band）。
+            ここには残りの探し方だけを置く。 */}
+        <aside className="column-side" aria-label="別の探し方">
             {/* 出演者名鑑とは別の軸。人が出てこないので、ジャンルとサークル、
                 メーカーで辿る。フッタのリンクだけでは辿り着けなかった。 */}
             <h2 className="side-head">別の探し方</h2>
@@ -313,8 +318,7 @@ function App() {
                 </a>
               </li>
             </ul>
-          </aside>
-        )}
+        </aside>
       </div>
 
       <section className="about">

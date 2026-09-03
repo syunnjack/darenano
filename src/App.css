@@ -412,6 +412,24 @@
   border-left: 4px solid var(--accent);
 }
 
+/* ジャンルから探す。検索窓のすぐ下に置く帯。
+   右のサイドに置いていて見つけられないと言われたので移した。 */
+.genres-band {
+  margin: 28px 0 0;
+}
+
+.genres-band h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+@media (min-width: 900px) {
+  .genres-band .genre-chips {
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 10px;
+  }
+}
+
 .genres-lead {
   margin: 0 0 16px;
   color: var(--muted);
@@ -428,8 +446,10 @@
 }
 
 @media (min-width: 900px) {
-  /* サイドでは1列に積む。 */
-  .genre-chips {
+  /* **サイドに置いたときだけ**1列に積む。
+     検索窓の下の帯（.genres-band）では横に並べたいので、
+     .column-side の中に限定する。 */
+  .column-side .genre-chips {
     grid-template-columns: 1fr;
     gap: 6px;
   }
