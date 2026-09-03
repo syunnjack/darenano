@@ -34,8 +34,13 @@ jobs:
             echo "手動実行なので、サイトマップ全体を送ります。"
             # head でパイプを閉じると grep が SIGPIPE で落ち、pipefail のせいで
             # ジョブごと失敗する。いったん全部書き出してから切る。
+            # sitemap.xml は**索引**になった（1ファイル50,000URLの上限を
+            # 超えたため）。中の sitemap-*.xml を順に取ってURLを集める。
             curl -fsS "https://darekore.jp/sitemap.xml" > sitemap.xml
-            grep -oP '(?<=<loc>)[^<]+' sitemap.xml > all-urls.txt
+            : > all-urls.txt
+            grep -oP '(?<=<loc>)[^<]+' sitemap.xml               | while read -r part; do
+                  curl -fsS "$part" | grep -oP '(?<=<loc>)[^<]+' >> all-urls.txt
+                done
             head -10000 all-urls.txt > urls.txt
             echo "サイトマップ $(wc -l < all-urls.txt)件のうち $(wc -l < urls.txt)件を送ります。"
           else

@@ -2418,15 +2418,55 @@ async function main() {
     ...kanaUrls,
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
   ]
-  const urls = entries
-    .map((loc) => `  <url><loc>${loc}</loc><lastmod>${today}</lastmod></url>`)
-    .join('\n')
+  // **1ファイルに入れられるのは 50,000URL まで。** 54,780件で超えていて、
+  // あふれたぶんは読まれない（2026-09-03 に発覚）。種類ごとに分けて、
+  // sitemap.xml は索引にする。**送信済みのURLは変えない**ので、
+  // サーチコンソールで送り直さなくてよい。
+  //
+  // 種類ごとに分けておくと、サーチコンソールで「どの種類が
+  // インデックスされていないか」が分かる。
+  const SITEMAP_MAX = 40000
+  const sectionOf = (url) => {
+    const rest = url.slice(`${SITE_URL}/`.length)
+    const head = rest.split('/')[0]
+    return ['actress', 'circle', 'author', 'series', 'label', 'doujin', 'genre', 'goods', 'kana']
+      .includes(head) ? head : 'main'
+  }
+
+  const bySection = new Map()
+  for (const url of entries) {
+    const key = sectionOf(url)
+    if (!bySection.has(key)) bySection.set(key, [])
+    bySection.get(key).push(url)
+  }
+
+  const sitemapFiles = []
+  for (const [section, list] of [...bySection].sort()) {
+    for (let part = 0; part * SITEMAP_MAX < list.length; part += 1) {
+      const chunk = list.slice(part * SITEMAP_MAX, (part + 1) * SITEMAP_MAX)
+      const name = part === 0 ? `sitemap-${section}.xml` : `sitemap-${section}-${part + 1}.xml`
+      const body = chunk
+        .map((loc) => `  <url><loc>${loc}</loc><lastmod>${today}</lastmod></url>`)
+        .join('\n')
+
+      await writeFile(
+        path.join(publicDir, name),
+        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`,
+        'utf8'
+      )
+      sitemapFiles.push({ name, count: chunk.length })
+    }
+  }
 
   await writeFile(
     path.join(publicDir, 'sitemap.xml'),
-    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
+    `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapFiles
+      .map((f) => `  <sitemap><loc>${SITE_URL}/${f.name}</loc><lastmod>${today}</lastmod></sitemap>`)
+      .join('\n')}\n</sitemapindex>\n`,
     'utf8'
   )
+  console.log(`サイトマップ索引: ${sitemapFiles.length}ファイル`)
+  for (const f of sitemapFiles) console.log(`  ${f.name}  ${f.count.toLocaleString('ja-JP')}URL`)
 
   // 出演者以外のページも記録する。**これが無いと IndexNow に通知されない。**
   // published-slugs.txt は出演者のスラッグしか持たないため、シリーズ・

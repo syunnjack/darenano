@@ -21,5 +21,7 @@ public/data/search-index.tsv
 public/data/featured.json
 public/data/*.tmp
 public/sitemap.xml
+# 種類ごとに分けたサイトマップ（1ファイル50,000URLの上限を超えたため）
+public/sitemap-*.xml
 
 scripts/.cache/
