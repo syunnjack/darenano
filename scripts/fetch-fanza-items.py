@@ -117,6 +117,31 @@ def month_bounds(month: str) -> tuple[str, str]:
     return f'{year:04d}-{mon:02d}-01T00:00:00', f'{year:04d}-{mon:02d}-{last_day:02d}T23:59:59'
 
 
+def counted_twice(bucket: dict, cid: str, open_month: str) -> bool:
+    """**まだ終わっていない月は、次の回でもう一度なめる。**
+
+    「次に取る月」は最後の月だけ進まない（その月の作品はまだ増えるため）。
+    そのため走らせるたびに同じ作品を数え直していて、件数が回を追うごとに
+    増えていた。数えた作品IDをその月のあいだだけ `r` に控えて2度目を飛ばす。
+    月が変われば捨てる（過去の月は二度となめない）。
+    """
+    if not open_month:
+        return False
+
+    seen = bucket.setdefault('r', [])
+    if cid in seen:
+        return True
+
+    seen.append(cid)
+    return False
+
+
+def forget_open_month(*collections) -> None:
+    for group in collections:
+        for bucket in group.values():
+            bucket.pop('r', None)
+
+
 def scan_month(cred: dict, month: str) -> tuple[list[dict], int]:
     """その月に発売された作品をすべて取る。(作品, APIが言う総数)"""
     gte, lte = month_bounds(month)
@@ -243,10 +268,24 @@ def main() -> int:
 
     print(f'{todo[0]} から {todo[-1]} まで {len(todo)}か月ぶんを取ります。', file=sys.stderr)
 
+    open_month = '' if reset else str(state.get('openMonth') or '')
+
     for month in todo:
         if (time.time() - started) / 60 >= limit_minutes:
             print(f'{limit_minutes}分を過ぎたので {month} の手前で切り上げます。', file=sys.stderr)
             break
+
+        # 終わった月はもう二度となめないので、控えは要らない。
+        if month == last_month:
+            if open_month != month:
+                forget_open_month(actresses, series, labels)
+                open_month = month
+        elif open_month:
+            forget_open_month(actresses, series, labels)
+            open_month = ''
+
+        # 同じ月のなかで同じ作品が2回返ることがある（offset の境目など）。
+        month_seen = set()
 
         items, total = scan_month(cred, month)
         scanned += len(items)
@@ -259,21 +298,38 @@ def main() -> int:
             info = raw.get('iteminfo') or {}
             cast = names(info, 'actress')
 
+            cid = work['c']
+
             for ident, _ in cast:
                 bucket = actresses.setdefault(ident, {'n': 0, 'w': []})
-                bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_ACTRESS)
+                if ('a', ident, cid) in month_seen:
+                    continue
+                month_seen.add(('a', ident, cid))
+                if counted_twice(bucket, cid, open_month):
+                    continue
+                bucket['n'] += 1
 
             for ident, name in names(info, 'series'):
                 bucket = series.setdefault(ident, {'name': name, 'n': 0, 'w': []})
-                bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                if ('s', ident, cid) in month_seen:
+                    continue
+                month_seen.add(('s', ident, cid))
+                if counted_twice(bucket, cid, open_month):
+                    continue
+                bucket['n'] += 1
                 add_cast(bucket, cast)
 
             for ident, name in names(info, 'label'):
                 bucket = labels.setdefault(ident, {'name': name, 'n': 0, 'w': []})
-                bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                if ('l', ident, cid) in month_seen:
+                    continue
+                month_seen.add(('l', ident, cid))
+                if counted_twice(bucket, cid, open_month):
+                    continue
+                bucket['n'] += 1
                 add_cast(bucket, cast)
 
             keep_newest(newest, work, NEWEST)
@@ -283,6 +339,7 @@ def main() -> int:
         # 月ごとに書き出す。途中で止まっても、取れたぶんは残る。
         state = {
             'nextMonth': months(month, last_month)[1] if month != last_month else last_month,
+            'openMonth': open_month,
             'scanned': scanned,
             'confirmedOn': today.isoformat(),
             'lastMonth': month,

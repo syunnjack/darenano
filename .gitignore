@@ -32,3 +32,4 @@ public/sitemap.xml
 public/sitemap-*.xml
 
 scripts/.cache/
+__pycache__/

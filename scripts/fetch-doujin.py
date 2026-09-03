@@ -109,6 +109,31 @@ def keep_newest(bucket: list, work: dict, limit: int) -> None:
     bucket.sort(key=lambda w: (w['d'], w['c']), reverse=True)
     del bucket[limit:]
 
+def counted_twice(bucket: dict, cid: str, open_month: str) -> bool:
+    """**まだ終わっていない月は、次の回でもう一度なめる。**
+
+    「次に取る月」は最後の月だけ進まない（その月の作品はまだ増えるため）。
+    そのため走らせるたびに同じ作品を数え直していて、件数が回を追うごとに
+    増えていた。数えた作品IDをその月のあいだだけ `r` に控えて2度目を飛ばす。
+    月が変われば捨てる（過去の月は二度となめない）。
+    """
+    if not open_month:
+        return False
+
+    seen = bucket.setdefault('r', [])
+    if cid in seen:
+        return True
+
+    seen.append(cid)
+    return False
+
+
+def forget_open_month(*collections) -> None:
+    for group in collections:
+        for bucket in group.values():
+            bucket.pop('r', None)
+
+
 
 def load(path: Path) -> dict:
     if not path.exists():
@@ -182,10 +207,13 @@ def main() -> int:
 
     print(f'{todo[0]} から {todo[-1]} まで {len(todo)}か月ぶんを取ります。', file=sys.stderr)
 
+    open_month = '' if reset else str(state.get('openMonth') or '')
+
     def save(next_month: str) -> None:
         head = {'confirmedOn': today.isoformat(), 'scanned': scanned, 'skipped': skipped,
                 'source': 'FANZA アフィリエイト Web サービス（doujin / digital_doujin）'}
-        state_path.write_text(json.dumps(dict(head, nextMonth=next_month), ensure_ascii=False),
+        state_path.write_text(json.dumps(dict(head, nextMonth=next_month, openMonth=open_month),
+                                         ensure_ascii=False),
                               encoding='utf-8')
         circles_path.write_text(json.dumps(dict(head, circles=circles), ensure_ascii=False),
                                 encoding='utf-8')
@@ -197,6 +225,18 @@ def main() -> int:
             print(f'{limit_minutes}分を過ぎたので {month} の手前で切り上げます。', file=sys.stderr)
             save(month)
             break
+
+        # 終わった月はもう二度となめないので、控えは要らない。
+        if month == last_month:
+            if open_month != month:
+                forget_open_month(circles, genres)
+                open_month = month
+        elif open_month:
+            forget_open_month(circles, genres)
+            open_month = ''
+
+        # 同じ月のなかで同じ作品が2回返ることがある（offset の境目など）。
+        month_seen = set()
 
         items, total = scan_month(cred, month)
         got = 0
@@ -229,8 +269,13 @@ def main() -> int:
                 if not ident or not allowed(name):
                     continue
                 bucket = circles.setdefault(ident, {'name': name, 'n': 0, 'w': []})
-                bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                if ('c', ident, cid) in month_seen:
+                    continue
+                month_seen.add(('c', ident, cid))
+                if counted_twice(bucket, cid, open_month):
+                    continue
+                bucket['n'] += 1
 
             for entry in info.get('genre') or []:
                 name = str(entry.get('name') or '').strip()
@@ -238,8 +283,13 @@ def main() -> int:
                 if not ident or not allowed(name):
                     continue
                 bucket = genres.setdefault(ident, {'name': name, 'n': 0, 'w': []})
-                bucket['n'] += 1
                 keep_newest(bucket['w'], work, WORKS_PER_GROUP)
+                if ('g', ident, cid) in month_seen:
+                    continue
+                month_seen.add(('g', ident, cid))
+                if counted_twice(bucket, cid, open_month):
+                    continue
+                bucket['n'] += 1
 
         print(f'  {month}  {got:,}件（除いた {skipped:,}）/ APIの総数 {total:,}  '
               f'サークル {len(circles):,} ジャンル {len(genres):,}', file=sys.stderr)

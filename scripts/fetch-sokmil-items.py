@@ -120,6 +120,29 @@ def call(cred: dict, offset: int, month: str = '') -> dict:
     return {}
 
 
+def counted_twice(bucket: dict, cid: str, open_month: str) -> bool:
+    """**まだ終わっていない月は、次の回でもう一度なめる。**
+
+    「次に取る月」は最後の月だけ進まない（その月の作品はまだ増えるため）。
+    そのまま数えると走らせるたびに件数が増える。数えた作品IDを、その月の
+    あいだだけ `r` に控えて2度目を飛ばす。月が変われば捨てる。
+    """
+    if not open_month:
+        return False
+
+    seen = bucket.setdefault('r', [])
+    if cid in seen:
+        return True
+
+    seen.append(cid)
+    return False
+
+
+def forget_open_month(group: dict) -> None:
+    for bucket in group.values():
+        bucket.pop('r', None)
+
+
 def load(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -185,9 +208,12 @@ def main() -> int:
         print('取る月がありません。', file=sys.stderr)
         return 0
 
+    open_month = '' if reset else str(state.get('openMonth') or '')
+
     def save(next_month: str):
         state_path.write_text(json.dumps({
-            'nextMonth': next_month, 'scanned': scanned, 'confirmedOn': today.isoformat(),
+            'nextMonth': next_month, 'openMonth': open_month,
+            'scanned': scanned, 'confirmedOn': today.isoformat(),
         }, ensure_ascii=False), encoding='utf-8')
         works_path.write_text(json.dumps({
             'confirmedOn': today.isoformat(),
@@ -205,6 +231,17 @@ def main() -> int:
             save(month)
             break
 
+        # 終わった月はもう二度となめないので、控えは要らない。
+        if month == last_month:
+            if open_month != month:
+                forget_open_month(actors)
+                open_month = month
+        elif open_month:
+            forget_open_month(actors)
+            open_month = ''
+
+        # 同じ月のなかで同じ作品が2回返ることがある（offset の境目など）。
+        month_seen = set()
         offset, total, got = 1, None, 0
 
         while True:
@@ -235,9 +272,21 @@ def main() -> int:
 
                 for person in (item.get('iteminfo') or {}).get('actor') or []:
                     ident = str(person.get('id') or '').strip()
-                    if ident:
-                        keep_newest(actors.setdefault(ident, {'n': 0, 'w': []})['w'], work)
-                        actors[ident]['n'] += 1
+                    if not ident:
+                        continue
+
+                    bucket = actors.setdefault(ident, {'n': 0, 'w': []})
+                    keep_newest(bucket['w'], work)
+
+                    if (ident, cid) in month_seen:
+                        continue
+
+                    month_seen.add((ident, cid))
+
+                    if counted_twice(bucket, cid, open_month):
+                        continue
+
+                    bucket['n'] += 1
 
             offset += HITS
             if total and offset > total:

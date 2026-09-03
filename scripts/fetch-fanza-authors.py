@@ -115,6 +115,36 @@ def keep_newest(bucket: list, work: dict) -> None:
     del bucket[WORKS_PER_FLOOR:]
 
 
+def counted_twice(bucket: dict, key: str, cid: str, open_month: str) -> bool:
+    """**まだ終わっていない月は、次の回でもう一度なめる。**
+
+    「次に取る月」は最後の月だけ進まない（その月の作品はまだ増えるため）。
+    そのため走らせるたびに同じ作品を数え直していて、件数が回を追うごとに
+    増えていた。数えた作品IDを、そのフロアの開いている月のあいだだけ
+    `r[フロア]` に控えて2度目を飛ばす。**フロアごとに進み方が違うので、
+    控えもフロアごとに持つ。**
+    """
+    if not open_month:
+        return False
+
+    seen = bucket.setdefault('r', {}).setdefault(key, [])
+    if cid in seen:
+        return True
+
+    seen.append(cid)
+    return False
+
+
+def forget_open_month(group: dict, key: str) -> None:
+    for bucket in group.values():
+        seen = bucket.get('r')
+        if not seen:
+            continue
+        seen.pop(key, None)
+        if not seen:
+            bucket.pop('r', None)
+
+
 def load(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -148,9 +178,11 @@ def main() -> int:
     started = time.time()
     scanned = int(state.get('scanned') or 0)
     progress = dict(state.get('progress') or {})
+    open_months = {} if reset else dict(state.get('openMonths') or {})
 
     def save() -> None:
-        STATE.write_text(json.dumps({'progress': progress, 'scanned': scanned,
+        STATE.write_text(json.dumps({'progress': progress, 'openMonths': open_months,
+                                     'scanned': scanned,
                                      'confirmedOn': today.isoformat()}, ensure_ascii=False),
                          encoding='utf-8')
         OUT.write_text(json.dumps({
@@ -173,6 +205,18 @@ def main() -> int:
                 progress[key] = month
                 save()
                 return 0
+
+            # 終わった月はもう二度となめないので、控えは要らない。
+            if month == last_month:
+                if open_months.get(key) != month:
+                    forget_open_month(authors, key)
+                    open_months[key] = month
+            elif open_months.get(key):
+                forget_open_month(authors, key)
+                open_months.pop(key, None)
+
+            # 同じ月のなかで同じ作品が2回返ることがある（offset の境目など）。
+            month_seen = set()
 
             gte, lte = month_bounds(month)
             offset, total, got = 1, None, 0
@@ -214,8 +258,13 @@ def main() -> int:
                     for ident, name in writers:
                         bucket = authors.setdefault(ident, {'name': name, 'n': 0, 'w': {}})
                         bucket['name'] = name
-                        bucket['n'] += 1
                         keep_newest(bucket['w'].setdefault(key, []), work)
+                        if (ident, cid) in month_seen:
+                            continue
+                        month_seen.add((ident, cid))
+                        if counted_twice(bucket, key, cid, open_months.get(key, '')):
+                            continue
+                        bucket['n'] += 1
 
                 offset += 100
                 time.sleep(PAUSE)
