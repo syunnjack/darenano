@@ -1175,13 +1175,29 @@ function renderRankingPage() {
  * リンクは支給されたタグの URL をそのまま使う。
  */
 const GENRE_ADS = {
+  gapart: {
+    name: 'ギャルズアパートメント',
+    // 支給タグは href が公式サイトで onclick で計測URLへ飛ばす形だった。
+    // JavaScript を切っていると計測されないので、計測URLを href にする。
+    url: 'https://ad.886644.com/member/link.php?i=50d979316976e&m=6a99209d87092&guid=ON',
+    image: 'https://ad.886644.com/member/data.php?i=50d979316976e&m=6a99209d87092',
+    width: 300,
+    height: 100,
+    note: '24時間の部屋配信',
+    // 素人・ナンパ・ハメ撮り・ギャル。部屋を覗く形の配信なので、
+    // 作り込んだ作品より、この辺りを見に来た人に近い。
+    slugs: ['shirouto', 'nanpa', 'hamedori', 'gyaru'],
+  },
   mistressland: {
     name: 'ミストレスランド',
-    url: 'https://ad.886644.com/member/link.php?i=67d8e4edc661e&m=6a99209d87092&guid=ON',
-    image: 'https://ad.886644.com/member/data.php?i=67d8e4edc661e&m=6a99209d87092',
-    width: 234,
-    height: 60,
-    note: '女王様・M男調教の作品販売',
+    // 234x60（i=67d8e4edc661e）と 300x100（i=50d9777081832）を支給された。
+    // **同じ広告主の別素材**（どちらも 337799.com「女王様SM ミストレスランド」）。
+    // 大きい方が目に入るので、こちらを使う。
+    url: 'https://ad.886644.com/member/link.php?i=50d9777081832&m=6a99209d87092&guid=ON',
+    image: 'https://ad.886644.com/member/data.php?i=50d9777081832&m=6a99209d87092',
+    width: 300,
+    height: 100,
+    note: '女王様・M男調教の作品配信',
     slugs: ['sm', 'm-otoko', 'shuchi', 'chijo'],
   },
 }
