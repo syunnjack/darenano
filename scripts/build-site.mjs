@@ -1824,8 +1824,8 @@ async function main() {
     usedSlugs.add(slug)
     person.slug = slug
     person.profile = profileOf(person)
-    person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
-      || indexedBefore.has(slug)
+    person.naturallyIndexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
+    person.indexable = person.naturallyIndexable || indexedBefore.has(slug)
   }
 
   const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
@@ -2430,6 +2430,16 @@ async function main() {
     `${[...new Set(entries.filter((url) => !url.includes('/actress/')))].sort().join('\n')}\n`,
     'utf8'
   )
+
+  // 記録があるおかげで載せ続けているページ。**各社のデータが痩せた人。**
+  // どれを戻したか分かるように書き出す（IndexNow に送るときに使う）。
+  const keptBySticky = indexable.filter((p) => !p.naturallyIndexable)
+  await writeFile(
+    path.join(publicDir, 'data/kept-indexed.txt'),
+    `${keptBySticky.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`).sort().join('\n')}\n`,
+    'utf8'
+  )
+  console.log(`記録があるので載せ続けたページ: ${keptBySticky.length.toLocaleString('ja-JP')}件`)
 
   // 次回のために、検索に載せたスラッグを記録する。
   // **これが無いと、データが痩せた人のページが noindex に落ちる。**
