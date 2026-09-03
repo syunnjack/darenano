@@ -61,8 +61,21 @@ jobs:
             exit 0
           fi
           git commit -m "FANZA の動画以外のフロアを取り直す"
-          git pull --rebase --autostash origin main
-          git push
+          # **取り直しは何本も同時に走る。** 同時に push すると片方が落ち、
+          # 数時間ぶんの取得がまるごと消える。競合したら待って引き直す。
+          pushed=false
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin main && git push; then
+              pushed=true
+              break
+            fi
+            echo "push が競合しました（${attempt}回目）。待って試します。"
+            sleep $((15 * attempt))
+          done
+          if [ "$pushed" != true ]; then
+            echo "push できませんでした。取れたデータは残っていません。" >&2
+            exit 1
+          fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
   deploy:
