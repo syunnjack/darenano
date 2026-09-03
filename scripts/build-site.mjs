@@ -839,6 +839,31 @@ function renderRedirect(person) {
 `
 }
 
+/**
+ * 各社のデータから消えた人の、旧URL。
+ *
+ * 出典が無くなった以上、中身は書けない（推測は載せない方針）。
+ * それでも 404 は返さない。**検索エンジンは登録済みのURLを覚えていて、
+ * 404 が続くとサイト全体の評価に響く。** 索引へ送る。
+ */
+function renderGoneRedirect(slug) {
+  return `<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex,follow" />
+    <link rel="canonical" href="${SITE_URL}/actress/" />
+    <meta http-equiv="refresh" content="0; url=/actress/" />
+    <title>このページは公開を終えました</title>
+  </head>
+  <body>
+    <p>このページで扱っていた方は、各社のデータから見当たらなくなったため、
+       いまは載せていません。<a href="/actress/">五十音索引</a>から探せます。</p>
+  </body>
+</html>
+`
+}
+
 /** 五十音索引の入口。頭文字ごとのページへ振り分ける。 */
 function renderIndexPage(groups, total, detailed, confirmedOn) {
   const counts = new Map(groups.map(([head, members]) => [head, members.length]))
@@ -873,10 +898,15 @@ function renderIndexPage(groups, total, detailed, confirmedOn) {
 }
 
 /** 頭文字ごとの一覧ページ。 */
-function renderHeadPage(head, members, confirmedOn, groups) {
+// 1ページに並べる人数。あ行は 18,000人いて、全部並べると 1.4MB になった
+// （2026-09-03 実測）。重いページは読み込みも巡回も遅くなるので分ける。
+const KANA_PER_PAGE = 400
+
+function renderHeadPage(head, members, confirmedOn, groups, page = 1, pages = 1) {
   // 名前を押すと当サイトの出演者ページへ。その横に、各社の作品一覧への
   // リンクを小さく置く。URLは各社のAPIが返したものだけを使う。
-  const links = members
+  const shown = members.slice((page - 1) * KANA_PER_PAGE, page * KANA_PER_PAGE)
+  const links = shown
     .map((p) => {
       const shops = [
         ['FANZA', p.fanza?.listUrl],
@@ -907,19 +937,33 @@ function renderHeadPage(head, members, confirmedOn, groups) {
     .join('')
 
   const label = head === 'その他' ? 'その他の読み' : `${head}から始まる読み`
-  const title = `${label}の出演者一覧（${members.length.toLocaleString('ja-JP')}人）｜${SITE_NAME}`
-  const description = `${label}の出演者${members.length.toLocaleString('ja-JP')}人の一覧です。FANZA・DUGA が公開している情報をもとにしています。`
+  const path2 = (n) => `/kana/${encodeURIComponent(head)}/${n === 1 ? '' : `${n}/`}`
+  const pageText = pages > 1 ? `（${page}／${pages}ページ）` : ''
+  const title = `${label}の出演者一覧（${members.length.toLocaleString('ja-JP')}人）${pageText}｜${SITE_NAME}`
+  const description = `${label}の出演者${members.length.toLocaleString('ja-JP')}人の一覧です。`
+    + (pages > 1 ? `このページには${((page - 1) * KANA_PER_PAGE + 1).toLocaleString('ja-JP')}人目から${((page - 1) * KANA_PER_PAGE + shown.length).toLocaleString('ja-JP')}人目までを載せています。` : '')
+    + 'FANZA・DUGA が公開している情報をもとにしています。'
+
+  // ページ送り。**全ページを並べる**（巡回で全員に届く道を切らないため）。
+  const pager = pages > 1
+    ? `<nav class="kana-nav pager">${Array.from({ length: pages }, (_, i) => i + 1)
+        .map((n) => (n === page
+          ? `<span class="current">${n}</span>`
+          : `<a href="${path2(n)}">${n}</a>`))
+        .join('')}</nav>`
+    : ''
 
   return shell({
     title,
     description,
-    canonical: `${SITE_URL}/kana/${encodeURIComponent(head)}/`,
+    canonical: `${SITE_URL}${path2(page)}`,
     crumbs: `<a href="/actress/">五十音索引</a> ＞ ${escapeHtml(head)}`,
     body: `
       <h1>${escapeHtml(label)}の出演者</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <nav class="kana-nav">${nav}</nav>
       <ul class="name-list">${links}</ul>
+      ${pager}
       <p class="note">名前を押すと当サイトのページへ、社名を押すと各社の作品一覧へ移動します。社名のリンクは広告です。</p>`,
   })
 }
@@ -947,8 +991,14 @@ function renderRankingPage() {
 }
 
 /** ジャンル別に、出演本数の多い順で並べたページ。 */
+// ジャンルページに並べる人数。騎乗位は上限なしで 1.4MB になっていた
+// （2026-09-03 実測）。全員への道は五十音索引が持っているので、
+// ここは「多く出ている方」に絞ってよい。
+const GENRE_PER_PAGE = 300
+
 function renderGenrePage(genre, rows, confirmedOn) {
-  const list = rows
+  const shown = rows.slice(0, GENRE_PER_PAGE)
+  const list = shown
     .map((row, index) => `
       <li>
         <span class="rank-no">${index + 1}</span>
@@ -987,11 +1037,11 @@ function renderGenrePage(genre, rows, confirmedOn) {
 
   const description = `${used.map((k) => sourceNames[k]).join('・')} が「${genre.name}」に分類している`
     + `作品${genre.works.toLocaleString('ja-JP')}件から、`
-    + `出演本数の多い方${rows.length.toLocaleString('ja-JP')}人を並べています。`
+    + `出演本数の多い方${shown.length.toLocaleString('ja-JP')}人を並べています。`
     + akaText
 
   return shell({
-    title: `${genre.name}の作品に多く出ている方${rows.length.toLocaleString('ja-JP')}人｜${SITE_NAME}`,
+    title: `${genre.name}の作品に多く出ている方${shown.length.toLocaleString('ja-JP')}人｜${SITE_NAME}`,
     description,
     canonical: `${SITE_URL}/genre/${genre.slug}/`,
     crumbs: `<a href="/genre/">ジャンル別</a> ＞ ${escapeHtml(genre.name)}`,
@@ -1034,6 +1084,9 @@ function renderGenrePage(genre, rows, confirmedOn) {
       ${renderBanner(genre.slug)}
       <h2>出演本数の多い方</h2>
       <ol class="rank-list">${list}</ol>
+      ${rows.length > shown.length
+        ? `<p class="note">このジャンルに当てはまる方は${rows.length.toLocaleString('ja-JP')}人います。出演本数の多い${shown.length}人までを載せています。全員は <a href="/actress/">五十音索引</a> から探せます。</p>`
+        : ''}
       <script type="application/ld+json">${JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
@@ -1221,25 +1274,42 @@ function renderGroupPage(kind, entry, cast, confirmedOn) {
 }
 
 /** シリーズ別・レーベル別の入口。 */
-function renderGroupIndexPage(kind, entries, confirmedOn) {
+// サークル一覧は 17,600件を1枚に並べて 1.6MB になっていた（2026-09-03 実測）。
+// 巡回で全件に届く道は残したいので、切り捨てずにページを分ける。
+const GROUP_PER_PAGE = 600
+
+function renderGroupIndexPage(kind, entries, confirmedOn, page = 1, pages = 1) {
   const meta = GROUP_KINDS[kind]
+  const shown = entries.slice((page - 1) * GROUP_PER_PAGE, page * GROUP_PER_PAGE)
+  const at = (n) => `/${meta.path}/${n === 1 ? '' : `${n}/`}`
   const description = `FANZA の動画に付けられている${meta.unit}のうち、`
     + `収録作品の多い${entries.length.toLocaleString('ja-JP')}件を並べています。`
+    + (pages > 1 ? `このページは${page}／${pages}ページ目です。` : '')
 
-  const list = entries
+  const list = shown
     .map((entry) => `<li><a href="/${meta.path}/${entry.id}/">${escapeHtml(entry.name)}</a><span class="rank-count">${entry.n.toLocaleString('ja-JP')}作品</span></li>`)
     .join('')
 
+  const pager = pages > 1
+    ? `<nav class="kana-nav pager">${Array.from({ length: pages }, (_, i) => i + 1)
+        .map((n) => (n === page
+          ? `<span class="current">${n}</span>`
+          : `<a href="${at(n)}">${n}</a>`))
+        .join('')}</nav>`
+    : ''
+
   return shell({
-    title: `${meta.nav}に見る出演作品（${entries.length.toLocaleString('ja-JP')}${meta.unit}）｜${SITE_NAME}`,
+    title: `${meta.nav}に見る出演作品（${entries.length.toLocaleString('ja-JP')}${meta.unit}）`
+      + `${pages > 1 ? `${page}ページ目` : ''}｜${SITE_NAME}`,
     description,
-    canonical: `${SITE_URL}/${meta.path}/`,
+    canonical: `${SITE_URL}${at(page)}`,
     crumbs: escapeHtml(meta.nav),
     body: `
       <h1>${escapeHtml(meta.nav)}</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <p class="confirmed">FANZA が作品に付けている${escapeHtml(meta.unit)}をそのまま数えたものです。作品数の少ないものはページを作っていません。</p>
-      <ul class="name-list">${list}</ul>`,
+      <ul class="name-list">${list}</ul>
+      ${pager}`,
   })
 }
 
@@ -1315,21 +1385,34 @@ function renderDoujinPage(kind, entry, confirmedOn) {
 }
 
 /** 同人の入口。 */
-function renderDoujinIndex(kind, entries, confirmedOn) {
+function renderDoujinIndex(kind, entries, confirmedOn, page = 1, pages = 1) {
   const meta = DOUJIN_KINDS[kind]
+  const shown = entries.slice((page - 1) * GROUP_PER_PAGE, page * GROUP_PER_PAGE)
+  const at = (n) => `/${meta.path}/${n === 1 ? '' : `${n}/`}`
   const description = `FANZA同人の${meta.unit}のうち、収録作品の多い${entries.length.toLocaleString('ja-JP')}件を並べています。`
+    + (pages > 1 ? `このページは${page}／${pages}ページ目です。` : '')
+
+  const pager = pages > 1
+    ? `<nav class="kana-nav pager">${Array.from({ length: pages }, (_, i) => i + 1)
+        .map((n) => (n === page
+          ? `<span class="current">${n}</span>`
+          : `<a href="${at(n)}">${n}</a>`))
+        .join('')}</nav>`
+    : ''
 
   return shell({
-    title: `${meta.nav}（${entries.length.toLocaleString('ja-JP')}${meta.unit}）｜${SITE_NAME}`,
+    title: `${meta.nav}（${entries.length.toLocaleString('ja-JP')}${meta.unit}）`
+      + `${pages > 1 ? `${page}ページ目` : ''}｜${SITE_NAME}`,
     description,
-    canonical: `${SITE_URL}/${meta.path}/`,
+    canonical: `${SITE_URL}${at(page)}`,
     crumbs: escapeHtml(meta.nav),
     body: `
       <h1>${escapeHtml(meta.nav)}</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
-      <ul class="name-list">${entries
+      <ul class="name-list">${shown
         .map((entry) => `<li><a href="/${meta.path}/${entry.id}/">${escapeHtml(entry.name)}</a><span class="rank-count">${entry.n.toLocaleString('ja-JP')}作品</span></li>`)
-        .join('')}</ul>`,
+        .join('')}</ul>
+      ${pager}`,
   })
 }
 
@@ -1837,7 +1920,28 @@ async function main() {
       await addRedirect(slugify(alias), person)
     }
   }
+  // 元データから消えた人。**published.has(p.slug) では拾えない。**
+  // people に居ないので targets にも入らず、ページが丸ごと消えて 404 になる
+  // （2026-09-03 に6件見つかった: 佐藤遥希・原紗央莉ほか）。
+  // 検索エンジンには登録されたままなので、索引へ転送して 404 を作らない。
+  const goneSlugs = [...published].filter((slug) => !written.has(slug))
+
+  // 取得が途中で失敗すると、大量の人が「消えた」ことになる。
+  // その状態で作り直すと、公開中のページがまとめて転送に変わってしまう。
+  // **1割を超えたら作らずに止める。**
+  if (published.size && goneSlugs.length > published.size * 0.1) {
+    throw new Error(`公開済み ${published.size} 件のうち ${goneSlugs.length} 件が元データから消えています。`
+      + '取得に失敗している可能性が高いので、ページを作り直しません。')
+  }
+
+  for (const slug of goneSlugs) {
+    const dir = path.join(outDir, slug)
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'index.html'), renderGoneRedirect(slug), 'utf8')
+    written.add(slug)
+  }
   console.log(`旧URLからの転送ページ: ${redirectSlugs.length.toLocaleString('ja-JP')}件`)
+  console.log(`元データから消えた人の転送: ${goneSlugs.length.toLocaleString('ja-JP')}件`)
 
   // 索引ページには、中身のあるページだけを載せる。
   const indexable = targets.filter((p) => p.indexable)
@@ -1859,11 +1963,20 @@ async function main() {
   const kanaDir = path.join(publicDir, 'kana')
   await rm(kanaDir, { recursive: true, force: true })
 
+  const kanaUrls = []
   for (const [head, members] of indexGroups) {
     const dir = path.join(kanaDir, head)
-    await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, 'index.html'), renderHeadPage(head, members, confirmedOn, indexGroups), 'utf8')
+    const pages = Math.max(1, Math.ceil(members.length / KANA_PER_PAGE))
+
+    for (let page = 1; page <= pages; page += 1) {
+      const target = page === 1 ? dir : path.join(dir, String(page))
+      await mkdir(target, { recursive: true })
+      await writeFile(path.join(target, 'index.html'),
+        renderHeadPage(head, members, confirmedOn, indexGroups, page, pages), 'utf8')
+      kanaUrls.push(`${SITE_URL}/kana/${encodeURIComponent(head)}/${page === 1 ? '' : `${page}/`}`)
+    }
   }
+  console.log(`五十音索引: ${kanaUrls.length.toLocaleString('ja-JP')}ページ`)
 
   // 当サイトの投票数によるランキング。中身は表示時に Supabase から読む。
   const rankingDir = path.join(publicDir, 'ranking')
@@ -2047,9 +2160,18 @@ async function main() {
     }
 
     if (entries.length) {
-      await writeFile(path.join(dir, 'index.html'), renderGroupIndexPage(kind, entries, confirmedOn), 'utf8')
-      groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/`)
-      console.log(`${GROUP_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`)
+      const indexPages = Math.max(1, Math.ceil(entries.length / GROUP_PER_PAGE))
+
+      for (let page = 1; page <= indexPages; page += 1) {
+        const target = page === 1 ? dir : path.join(dir, String(page))
+        await mkdir(target, { recursive: true })
+        await writeFile(path.join(target, 'index.html'),
+          renderGroupIndexPage(kind, entries, confirmedOn, page, indexPages), 'utf8')
+        groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/${page === 1 ? '' : `${page}/`}`)
+      }
+
+      console.log(`${GROUP_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`
+        + `（入口 ${indexPages}ページ）`)
     }
   }
 
@@ -2103,9 +2225,18 @@ async function main() {
     }
 
     if (entries.length) {
-      await writeFile(path.join(dir, 'index.html'), renderDoujinIndex(kind, entries, confirmedOn), 'utf8')
-      doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/`)
-      console.log(`同人 ${DOUJIN_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`)
+      const indexPages = Math.max(1, Math.ceil(entries.length / GROUP_PER_PAGE))
+
+      for (let page = 1; page <= indexPages; page += 1) {
+        const target = page === 1 ? dir : path.join(dir, String(page))
+        await mkdir(target, { recursive: true })
+        await writeFile(path.join(target, 'index.html'),
+          renderDoujinIndex(kind, entries, confirmedOn, page, indexPages), 'utf8')
+        doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${page === 1 ? '' : `${page}/`}`)
+      }
+
+      console.log(`同人 ${DOUJIN_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`
+        + `（入口 ${indexPages}ページ）`)
     }
   }
 
@@ -2252,7 +2383,7 @@ async function main() {
     ...goodsUrls,
     ...authorUrls,
     `${SITE_URL}/privacy/`,
-    ...indexGroups.map(([head]) => `${SITE_URL}/kana/${encodeURIComponent(head)}/`),
+    ...kanaUrls,
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
   ]
   const urls = entries

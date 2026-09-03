@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "oxlint src",
-    "prebuild": "node scripts/build-site.mjs"
+    "prebuild": "node scripts/build-site.mjs",
+    "postbuild": "node scripts/prune-dist-data.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
