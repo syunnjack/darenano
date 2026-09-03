@@ -143,7 +143,7 @@ function renderAuthorWorks(kind, works) {
 }
 
 /** 作者ページ。出演者ページと同じ作りで、分野ごとに作品を並べる。 */
-function renderAuthorPage(author, confirmedOn) {
+function renderAuthorPage(author, confirmedOn, thin = false) {
   const canonical = `${SITE_URL}/author/${author.id}/`
   const kinds = Object.keys(author.w ?? {}).filter((k) => AUTHOR_FLOORS[k] && author.w[k]?.length)
   const fields = kinds.map((k) => AUTHOR_FLOORS[k].label).join('・')
@@ -158,6 +158,7 @@ function renderAuthorPage(author, confirmedOn) {
     </section>`).join('')
 
   return shell({
+    noindex: thin,
     title: `${author.name}の作品｜${SITE_NAME}`,
     description,
     canonical,
@@ -1358,13 +1359,14 @@ function renderDoujinWorks(works) {
 }
 
 /** 同人のサークル別・ジャンル別のページ。 */
-function renderDoujinPage(kind, entry, confirmedOn) {
+function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
   const meta = DOUJIN_KINDS[kind]
   const canonical = `${SITE_URL}/${meta.path}/${entry.id}/`
   const description = `FANZA同人の${meta.unit}「${entry.name}」に${entry.n.toLocaleString('ja-JP')}作品が`
     + `収録されています。新しい${entry.w.length}本を並べています。`
 
   return shell({
+    noindex: thin,
     title: `${entry.name}の同人作品｜${SITE_NAME}`,
     description,
     canonical,
@@ -1478,7 +1480,7 @@ function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn) {
 // 実際 /author/ へのリンクだけ先に出してしまい、本番で404を踏んだ。
 let hasAuthorPages = false
 
-function shell({ title, description, canonical, crumbs, body }) {
+function shell({ title, description, canonical, crumbs, body, noindex = false }) {
   return `<!doctype html>
 <html lang="ja">
   <head>
@@ -1488,6 +1490,7 @@ function shell({ title, description, canonical, crumbs, body }) {
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}" />
     <meta name="rating" content="adult" />
+    ${noindex ? '<meta name="robots" content="noindex,follow" />' : ''}
     <link rel="canonical" href="${canonical}" />
     <script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>
@@ -2193,6 +2196,8 @@ async function main() {
 
   // 同人。サークル別とジャンル別。人が入らないのでこの2軸になる。
   const DOUJIN_MIN = { circle: 5, genre: 30 }
+  // 作者ページと同じ考え方。ページは残して、検索に載せるのは中身のあるものだけ。
+  const DOUJIN_INDEX_MIN = { circle: 10, genre: 30 }
   const doujinUrls = []
 
   for (const [kind, file, key] of [
@@ -2220,8 +2225,9 @@ async function main() {
     for (const entry of entries) {
       const target = path.join(dir, entry.id)
       await mkdir(target, { recursive: true })
-      await writeFile(path.join(target, 'index.html'), renderDoujinPage(kind, entry, confirmedOn), 'utf8')
-      doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${entry.id}/`)
+      const thin = entry.n < DOUJIN_INDEX_MIN[kind]
+      await writeFile(path.join(target, 'index.html'), renderDoujinPage(kind, entry, confirmedOn, thin), 'utf8')
+      if (!thin) doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${entry.id}/`)
     }
 
     if (entries.length) {
@@ -2284,6 +2290,10 @@ async function main() {
   // 作者名鑑。出演者名鑑と並ぶもう1つの軸。
   // **1〜2作品の作者はページにしない**（薄いページを増やさないため）。
   const AUTHOR_MIN_WORKS = 3
+  // 作品が少ない作者のページは、本文が 700字ほどしかない（2026-09-03 実測）。
+  // 消すと 404 になるので**ページは残し、検索に載せない**。
+  // 作品ページへの導線は残るので、巡回の道は切れない。
+  const AUTHOR_INDEX_MIN = 8
   const authorUrls = []
 
   try {
@@ -2303,8 +2313,9 @@ async function main() {
     for (const author of authors) {
       const target = path.join(dir, author.id)
       await mkdir(target, { recursive: true })
-      await writeFile(path.join(target, 'index.html'), renderAuthorPage(author, confirmedOn), 'utf8')
-      authorUrls.push(`${SITE_URL}/author/${author.id}/`)
+      const thin = author.n < AUTHOR_INDEX_MIN
+      await writeFile(path.join(target, 'index.html'), renderAuthorPage(author, confirmedOn, thin), 'utf8')
+      if (!thin) authorUrls.push(`${SITE_URL}/author/${author.id}/`)
     }
 
     if (authors.length) {
