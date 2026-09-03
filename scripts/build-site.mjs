@@ -1165,47 +1165,84 @@ function renderRankingPage() {
 
 /** ジャンル別に、出演本数の多い順で並べたページ。 */
 /**
- * ジャンルに合う広告。**全ページに同じ広告を置かない。**
+ * ページの中身に合う広告。
  *
- * 以前バナー15枚を全ページに並べて、中身が無関係な商品の
- * キャンペーンだったため全部外した。ここは「そのジャンルを見に来た人に
- * 近いもの」だけを、該当するジャンルページにだけ置く。
+ * **全ページに同じ広告を並べない。** 以前バナー15枚を全ページに置いて、
+ * 中身が無関係な商品のキャンペーンだったため全部外した。
+ * ここは「そこを見に来た人に近いもの」だけを、該当するページに置く。
  *
- * ミストレスランドは女王様・M男調教の DL/DVD 販売（バナーの図柄で確認）。
- * リンクは支給されたタグの URL をそのまま使う。
+ * **1ページに出すのは1枠だけ。** 複数当てはまる場合は、ページごとに
+ * 固定で1つ選ぶ（開き直すたびに変わると落ち着かない）。
+ *
+ * リンクは支給されたタグの URL をそのまま使う。組み替えると成果が
+ * 計上されない。ライフパートナーのタグは href が公式サイトで onclick で
+ * 計測URLへ飛ばす形だったので、**計測URLを href にした**
+ * （JavaScript を切っていると計測されないため）。URL 自体は変えていない。
  */
-const GENRE_ADS = {
-  gapart: {
+const ADS = [
+  {
+    key: 'gapart',
     name: 'ギャルズアパートメント',
-    // 支給タグは href が公式サイトで onclick で計測URLへ飛ばす形だった。
-    // JavaScript を切っていると計測されないので、計測URLを href にする。
+    note: '24時間の部屋配信',
     url: 'https://ad.886644.com/member/link.php?i=50d979316976e&m=6a99209d87092&guid=ON',
     image: 'https://ad.886644.com/member/data.php?i=50d979316976e&m=6a99209d87092',
     width: 300,
     height: 100,
-    note: '24時間の部屋配信',
-    // 素人・ナンパ・ハメ撮り・ギャル。部屋を覗く形の配信なので、
-    // 作り込んだ作品より、この辺りを見に来た人に近い。
-    slugs: ['shirouto', 'nanpa', 'hamedori', 'gyaru'],
+    on: ['genre:shirouto', 'genre:nanpa', 'genre:hamedori', 'genre:gyaru'],
   },
-  mistressland: {
+  {
+    key: 'mistressland',
     name: 'ミストレスランド',
-    // 234x60（i=67d8e4edc661e）と 300x100（i=50d9777081832）を支給された。
-    // **同じ広告主の別素材**（どちらも 337799.com「女王様SM ミストレスランド」）。
-    // 大きい方が目に入るので、こちらを使う。
+    note: '女王様・M男調教の作品配信',
+    // 234x60 も支給されたが、337799.com で同じ広告主だったので大きい方だけ使う
     url: 'https://ad.886644.com/member/link.php?i=50d9777081832&m=6a99209d87092&guid=ON',
     image: 'https://ad.886644.com/member/data.php?i=50d9777081832&m=6a99209d87092',
     width: 300,
     height: 100,
-    note: '女王様・M男調教の作品配信',
-    slugs: ['sm', 'm-otoko', 'shuchi', 'chijo'],
+    on: ['genre:sm', 'genre:m-otoko', 'genre:shuchi', 'genre:chijo'],
   },
-}
+  {
+    key: 'fc2video',
+    name: 'FC2動画',
+    note: '投稿型の動画配信',
+    url: 'https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=356406&aff_siteid=348684&aff_shopid=146',
+    image: 'https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=348684&bid=20747&uid=356406',
+    width: 468,
+    height: 60,
+    on: ['genre:shirouto', 'genre:hamedori', 'genre:nanpa', 'genre:roshutsu', 'genre:panchira'],
+  },
+  {
+    key: 'fc2market',
+    name: 'FC2コンテンツマーケット',
+    note: '個人が売っている作品',
+    url: 'https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=356406&aff_siteid=348684&aff_shopid=158',
+    image: 'https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=348684&bid=20770&uid=356406',
+    width: 468,
+    height: 60,
+    // 同人と同じ「個人が作って売る」領域なので、サークルのページに置く
+    on: ['circle', 'doujin'],
+  },
+  {
+    key: 'fc2unlimited',
+    name: 'FC2動画 見放題',
+    note: '定額で見放題',
+    url: 'https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=356406&aff_siteid=348684&aff_shopid=310',
+    image: 'https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=348684&bid=20756&uid=356406',
+    width: 468,
+    height: 60,
+    on: ['genre:4k', 'genre:vr', 'genre:kyonyu', 'genre:bishojo', 'genre:jukujo', 'genre:hitozuma'],
+  },
+]
 
-/** そのジャンルに合う広告があれば返す。無ければ空。 */
-function renderGenreAd(slug) {
-  const ad = Object.values(GENRE_ADS).find((row) => row.slugs.includes(slug))
-  if (!ad) return ''
+/** そのページに合う広告を1枠だけ返す。無ければ空。 */
+function renderAd(pageKey) {
+  const matches = ADS.filter((ad) => ad.on.includes(pageKey))
+  if (!matches.length) return ''
+
+  // ページの名前から決めるので、同じページを開き直しても同じ広告が出る
+  let hash = 0
+  for (const ch of pageKey) hash = (hash * 31 + ch.codePointAt(0)) >>> 0
+  const ad = matches[hash % matches.length]
 
   return `<section class="genre-ad">
         <p class="pr">広告</p>
@@ -1309,7 +1346,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
         : ''}
       ${renderBanner(genre.slug)}
       <h2>出演本数の多い方</h2>
-      ${renderGenreAd(genre.slug)}
+      ${renderAd(`genre:${genre.slug}`)}
       <ol class="rank-list">${list}</ol>
       ${rows.length > shown.length
         ? `<p class="note">このジャンルに当てはまる方は${rows.length.toLocaleString('ja-JP')}人います。出演本数の多い${shown.length}人までを載せています。全員は <a href="/actress/">五十音索引</a> から探せます。</p>`
@@ -1638,6 +1675,7 @@ function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
     body: `
       <h1>${escapeHtml(entry.name)}</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
+      ${renderAd(kind)}
       <section class="work-block">
         <h2>FANZA同人の収録作品<span class="pr">広告</span></h2>
         ${renderDoujinWorks(entry.w)}
