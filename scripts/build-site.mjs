@@ -1569,6 +1569,44 @@ function renderDoujinWorks(works) {
 }
 
 /** 同人のサークル別・ジャンル別のページ。 */
+/**
+ * DLsite の作品リンク。
+ *
+ * **アフィリエイトIDが無いときは何も出さない。** 素のURLを置いても
+ * 成果にならないうえ、出典が増えるだけでページが重くなる。
+ * IDは公開URLに載るものなので秘密ではないが、無い状態で作らない。
+ *
+ * 形式（DLsite アフィリエイトの生成リンクと同じ）:
+ *   https://www.dlsite.com/maniax/dlaf/=/link/work/aid/<aid>/id/<RJ番号>.html
+ */
+const DLSITE_AFFILIATE_ID = process.env.DLSITE_AFFILIATE_ID || ''
+
+function dlsiteLink(workId) {
+  if (!DLSITE_AFFILIATE_ID) return ''
+  return `https://www.dlsite.com/maniax/dlaf/=/link/work/aid/${DLSITE_AFFILIATE_ID}/id/${workId}.html`
+}
+
+/** DLsite の作品を、表紙つきで並べる。 */
+function renderDlsiteWorks(works) {
+  if (!DLSITE_AFFILIATE_ID || !works?.length) return ''
+
+  const items = works.map((work) => {
+    const cover = work.i
+      ? `<img src="${escapeHtml(work.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="145" />`
+      : ''
+    const price = work.p ? `<span class="work-price">${Number(work.p).toLocaleString('ja-JP')}円</span>` : ''
+
+    return `<li>
+        <a href="${escapeHtml(dlsiteLink(work.c))}" target="_blank" rel="nofollow sponsored noopener">
+          ${cover}<span class="work-title">${escapeHtml(maskExplicit(work.t))}</span>
+        </a>
+        <span class="work-date">${escapeHtml(work.d)}</span>${price}
+      </li>`
+  }).join('')
+
+  return `<ul class="work-list">${items}</ul>`
+}
+
 function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
   const meta = DOUJIN_KINDS[kind]
   const canonical = `${SITE_URL}/${meta.path}/${entry.id}/`
@@ -1585,12 +1623,22 @@ function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
       <h1>${escapeHtml(entry.name)}</h1>
       <p class="reading">${escapeHtml(description)}${escapeHtml(confirmedOn)} 時点のデータです。</p>
       <section class="work-block">
-        <h2>収録作品<span class="pr">広告</span></h2>
+        <h2>FANZA同人の収録作品<span class="pr">広告</span></h2>
         ${renderDoujinWorks(entry.w)}
       </section>
+      ${entry.dlsite?.w?.length && renderDlsiteWorks(entry.dlsite.w)
+        ? `<section class="work-block">
+        <h2>DLsite の作品<span class="pr">広告</span></h2>
+        ${renderDlsiteWorks(entry.dlsite.w)}
+      </section>`
+        : ''}
       <section class="source-block">
         <h2>出典</h2>
-        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（同人）</a></li></ul>
+        <ul class="sources"><li><a href="https://affiliate.dmm.com/api/" target="_blank" rel="noopener">FANZA アフィリエイト Web サービス（同人）</a></li>${
+          entry.dlsite?.w?.length && DLSITE_AFFILIATE_ID
+            ? '<li><a href="https://www.dlsite.com/" target="_blank" rel="noopener">DLsite</a></li>'
+            : ''
+        }</ul>
         <p class="confirmed">同人は作品に出演者が入らないため、${escapeHtml(meta.unit)}でまとめています。未成年を思わせるもの・同意のないもの・近親相姦・排泄を含む作品は載せていません。</p>
       </section>`,
   })
@@ -2437,6 +2485,30 @@ async function main() {
   }
 
   // 同人。サークル別とジャンル別。人が入らないのでこの2軸になる。
+  // DLsite のサークル。**IDは各社で違うので、名前で引き当てる。**
+  // 記号と空白を落として突き合わせると 1,793件中 1,194件（66.6%）が
+  // FANZA同人のサークルと一致した（2026-09-03 実測）。
+  const normaliseCircle = (name) => String(name || '')
+    .replace(/[\s　]+/g, '')
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .toUpperCase()
+
+  const dlsiteByName = new Map()
+  try {
+    const file = await readJson(path.join(dataDir, 'dlsite-works.json'))
+    for (const [makerId, value] of Object.entries(file.circles ?? {})) {
+      const key = normaliseCircle(value.name)
+      if (key && !dlsiteByName.has(key)) {
+        dlsiteByName.set(key, { id: makerId, name: value.name, n: value.n ?? 0, w: value.w ?? [] })
+      }
+    }
+    console.log(`DLsite: サークル ${dlsiteByName.size.toLocaleString('ja-JP')}件を読み込みました`
+      + `${DLSITE_AFFILIATE_ID ? '' : '（DLSITE_AFFILIATE_ID が無いので作品リンクは出しません）'}`)
+  } catch {
+    console.log('DLsite のデータが無いので、同人ページは FANZA だけで作ります。')
+  }
+
   const DOUJIN_MIN = { circle: 5, genre: 30 }
   // 作者ページと同じ考え方。ページは残して、検索に載せるのは中身のあるものだけ。
   const DOUJIN_INDEX_MIN = { circle: 10, genre: 30 }
@@ -2459,6 +2531,19 @@ async function main() {
       .map(([id, value]) => ({ id, name: value.name, n: value.n ?? 0, w: value.w ?? [] }))
       .filter((entry) => entry.n >= DOUJIN_MIN[kind] && entry.w.length > 0 && displayableName(entry.name))
       .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ja'))
+
+    // サークルだけ、DLsite の同名サークルを結びつける
+    let matched = 0
+    if (kind === 'circle') {
+      for (const entry of entries) {
+        const found = dlsiteByName.get(normaliseCircle(entry.name))
+        if (found) {
+          entry.dlsite = found
+          matched += 1
+        }
+      }
+      console.log(`  DLsite と同名のサークル: ${matched.toLocaleString('ja-JP')}件`)
+    }
 
     const dir = path.join(publicDir, DOUJIN_KINDS[kind].path)
     await rm(dir, { recursive: true, force: true })
