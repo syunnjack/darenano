@@ -589,6 +589,12 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   }
   const alternateNames = [...new Set([person.reading, ...(person.fanza?.aliases ?? [])].filter(Boolean))]
   if (alternateNames.length) personSchema.alternateName = alternateNames
+  // **写真を構造化データにも入れる。** ページには出しているのに Person に
+  // 入れておらず、検索結果にサムネイルが出る手がかりを渡せていなかった
+  // （神木麗さんのページは 1,334表示で9クリック＝CTR 0.67%、2026-09-03）。
+  // URL は各社が返したものだけ。http は https に直す（混在をなくすため）。
+  const schemaPhoto = (person.fanza?.image || person.sokmil?.imageURL || '').replace(/^http:\/\//, 'https://')
+  if (schemaPhoto) personSchema.image = schemaPhoto
   if (/^\d{4}-\d{2}-\d{2}$/.test(person.fanza?.birthday ?? '')) personSchema.birthDate = person.fanza.birthday
   if (person.fanza?.prefectures) personSchema.homeLocation = { '@type': 'Place', name: person.fanza.prefectures }
 
