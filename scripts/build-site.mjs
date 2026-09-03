@@ -1799,6 +1799,20 @@ async function main() {
     // 初回は無くてよい。
   }
 
+  // **一度検索に載ったページを、あとから noindex に落とさない。**
+  // あさひ美玲さんのページは順位が付いてクリックもあったのに、
+  // FANZA から作品と画像が消えた時点で noindex になり、クリックが
+  // 0 になった（2026-09-03 に確認）。データが痩せるのは各社の都合で、
+  // ページの中身（名前・読み・別名義・関連する方）は残っている。
+  // 初回はこのファイルが無いので、公開済みのURLすべてを引き継ぐ。
+  let indexedBefore = null
+  try {
+    const text = await readFile(path.join(publicDir, 'data/indexed-slugs.txt'), 'utf8')
+    indexedBefore = new Set(text.split('\n').map((line) => line.trim()).filter(Boolean))
+  } catch {
+    indexedBefore = new Set(published)
+  }
+
   const usedSlugs = new Set()
   for (const person of people) {
     let slug = slugify(person.name)
@@ -1811,6 +1825,7 @@ async function main() {
     person.slug = slug
     person.profile = profileOf(person)
     person.indexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
+      || indexedBefore.has(slug)
   }
 
   const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
@@ -2413,6 +2428,14 @@ async function main() {
   await writeFile(
     path.join(publicDir, 'data/published-pages.txt'),
     `${[...new Set(entries.filter((url) => !url.includes('/actress/')))].sort().join('\n')}\n`,
+    'utf8'
+  )
+
+  // 次回のために、検索に載せたスラッグを記録する。
+  // **これが無いと、データが痩せた人のページが noindex に落ちる。**
+  await writeFile(
+    path.join(publicDir, 'data/indexed-slugs.txt'),
+    `${[...new Set([...indexedBefore, ...indexable.map((p) => p.slug)])].sort().join('\n')}\n`,
     'utf8'
   )
 
