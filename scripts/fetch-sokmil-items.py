@@ -76,6 +76,15 @@ def months(start: str, end: str) -> list:
 
 
 def month_bounds(month: str) -> tuple:
+    """**ここは翌月1日のままでよい。FANZA と同じに直してはいけない。**
+
+    FANZA の `lte_date` は「以下」なので、翌月1日を渡すと1日発売の作品まで入り、
+    前月と当月で二重に数えていた（2026-09-04 に4本を月末 23:59:59 に直した）。
+
+    ソクミルは違う。上限未満の人 25,551 人のうち 1,680 人が1日発売の作品を
+    持っているのに、**多く数えられている人は0人だった**（2026-09-04 実測）。
+    こちらの `lte_date` は「未満」なので、月末で切ると月末発売の作品を落とす。
+    """
     year, mon = (int(x) for x in month.split('-'))
     nxt_y, nxt_m = (year + 1, 1) if mon == 12 else (year, mon + 1)
 

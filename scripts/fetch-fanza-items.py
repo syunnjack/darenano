@@ -44,6 +44,7 @@ offset の上限は 50,000 なので、1か月が上限を超えることはま�
 使い方:
   FANZA_API_ID=xxx FANZA_AFFILIATE_ID=yyy python scripts/fetch-fanza-items.py
 """
+import calendar
 import json
 import os
 import sys
@@ -101,11 +102,19 @@ def months(start: str, end: str) -> list[str]:
 
 
 def month_bounds(month: str) -> tuple[str, str]:
-    """月の最初と最後を、APIが受ける形（YYYY-MM-DDTHH:MM:SS）で返す。"""
-    year, mon = (int(x) for x in month.split('-'))
-    nxt_y, nxt_m = (year + 1, 1) if mon == 12 else (year, mon + 1)
+    """**lte_date は「以下」なので、翌月1日を渡すとその日の作品まで入る。**
 
-    return f'{year:04d}-{mon:02d}-01T00:00:00', f'{nxt_y:04d}-{nxt_m:02d}-01T00:00:00'
+    翌月1日 00:00:00 を上限にしていたため、1日発売の作品が前月と当月の
+    両方で返り、作品数が1件ずつ多くなっていた（2026-09-04 に gravure-meikan.jp で
+    見つけて、こちらにも同じコードがあった）。月末の 23:59:59 で切る。
+
+    **ソクミル（fetch-sokmil-items.py）の lte_date は「未満」で、こちらの
+    バグは起きていない。**あちらを同じように直すと月末の作品を落とす。
+    """
+    year, mon = (int(x) for x in month.split('-'))
+    last_day = calendar.monthrange(year, mon)[1]
+
+    return f'{year:04d}-{mon:02d}-01T00:00:00', f'{year:04d}-{mon:02d}-{last_day:02d}T23:59:59'
 
 
 def scan_month(cred: dict, month: str) -> tuple[list[dict], int]:
