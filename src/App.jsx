@@ -356,7 +356,7 @@ function App() {
           URLは実際に叩いて題名で確かめたもの（2026-09-03）。 */}
       <section className="fanza-services">
         <h2>
-          FANZA の他のサービス<span className="pr">広告</span>
+          ライブチャット・くじなど<span className="pr">広告</span>
         </h2>
         <ul>
           <li>
@@ -368,6 +368,16 @@ function App() {
             <a href={fanzaLink('https://www.dmm.co.jp/kuji/')}
                target="_blank" rel="nofollow sponsored noopener">FANZAオンラインくじ</a>
             <span className="service-note">グッズが当たるオンラインくじです</span>
+          </li>
+          {/* バナーブリッジ（VI-VO）。支給されたタグのURLをそのまま使う。
+              組み替えると成果が計上されない。1x1の画像は表示回数を数える
+              ためのもので、タグの一部なので外さない。 */}
+          <li>
+            <a href="https://track.bannerbridge.net/click.php?APID=136927&affID=70825&siteID=204737"
+               target="_blank" rel="nofollow sponsored noopener">VI-VO（ビーボ）</a>
+            <span className="service-note">ライブチャット（18歳未満不可）</span>
+            <img src="https://track.bannerbridge.net/adtserv.php?APID=136927&affID=70825&siteID=204737"
+                 width="1" height="1" alt="" loading="lazy" referrerPolicy="no-referrer" />
           </li>
         </ul>
       </section>

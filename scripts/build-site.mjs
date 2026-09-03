@@ -120,14 +120,54 @@ const FANZA_SERVICES = [
   },
 ]
 
-/** FANZA の他サービスへの案内。全ページの下に置く。 */
+/**
+ * FANZA 以外のASPのサービス。
+ *
+ * **リンクは支給されたタグのURLをそのまま使う。**組み替えると成果が
+ * 計上されない。rel に sponsored と noopener を足しているのは Google の
+ * 方針と安全のためで、URL には触っていない。
+ *
+ * 1x1 の画像は表示回数を数えるためのもの。**タグの一部なので外さない。**
+ */
+const OTHER_SERVICES = [
+  {
+    key: 'gapart',
+    name: 'ギャルズアパートメント',
+    // 公式サイトの説明文から。「24時間お部屋を公開する条件に同意した
+    // 女の子達が住んでいるアパート」（2026-09-03 に g-apart.com で確認）
+    note: '24時間の部屋配信（18歳未満不可）',
+    // 支給されたタグは href が公式サイトで、onclick で計測URLへ飛ばす形だった。
+    // **JavaScript を切っていると計測されない**ので、計測URLを href にする。
+    // URL 自体は変えていない。
+    url: 'https://ad.886644.com/member/link.php?i=50d9788d242ae&m=6a99209d87092&guid=ON',
+    pixel: 'https://ad.886644.com/member/data.php?i=50d9788d242ae&m=6a99209d87092',
+    asp: 'ライフパートナー',
+  },
+  {
+    key: 'vivo',
+    name: 'VI-VO（ビーボ）',
+    note: 'ライブチャット（18歳未満不可）',
+    url: 'https://track.bannerbridge.net/click.php?APID=136927&affID=70825&siteID=204737',
+    pixel: 'https://track.bannerbridge.net/adtserv.php?APID=136927&affID=70825&siteID=204737',
+    asp: 'バナーブリッジ',
+  },
+]
+
+/** サービスへの案内。全ページの下に置く。 */
 function renderFanzaServices() {
-  const items = FANZA_SERVICES
-    .map((service) => `<li><a href="${fanzaLink(service.url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(service.name)}</a><span class="service-note">${escapeHtml(service.note)}</span></li>`)
+  const items = [
+    ...FANZA_SERVICES.map((service) => ({ ...service, href: fanzaLink(service.url) })),
+    ...OTHER_SERVICES.map((service) => ({ ...service, href: service.url })),
+  ]
+    .map((service) => `<li><a href="${escapeHtml(service.href)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(service.name)}</a><span class="service-note">${escapeHtml(service.note)}</span>${
+      service.pixel
+        ? `<img src="${escapeHtml(service.pixel)}" width="1" height="1" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+        : ''
+    }</li>`)
     .join('')
 
   return `<section class="fanza-services">
-        <h2>FANZA の他のサービス<span class="pr">広告</span></h2>
+        <h2>ライブチャット・くじなど<span class="pr">広告</span></h2>
         <ul>${items}</ul>
       </section>`
 }
@@ -1124,6 +1164,43 @@ function renderRankingPage() {
 }
 
 /** ジャンル別に、出演本数の多い順で並べたページ。 */
+/**
+ * ジャンルに合う広告。**全ページに同じ広告を置かない。**
+ *
+ * 以前バナー15枚を全ページに並べて、中身が無関係な商品の
+ * キャンペーンだったため全部外した。ここは「そのジャンルを見に来た人に
+ * 近いもの」だけを、該当するジャンルページにだけ置く。
+ *
+ * ミストレスランドは女王様・M男調教の DL/DVD 販売（バナーの図柄で確認）。
+ * リンクは支給されたタグの URL をそのまま使う。
+ */
+const GENRE_ADS = {
+  mistressland: {
+    name: 'ミストレスランド',
+    url: 'https://ad.886644.com/member/link.php?i=67d8e4edc661e&m=6a99209d87092&guid=ON',
+    image: 'https://ad.886644.com/member/data.php?i=67d8e4edc661e&m=6a99209d87092',
+    width: 234,
+    height: 60,
+    note: '女王様・M男調教の作品販売',
+    slugs: ['sm', 'm-otoko', 'shuchi', 'chijo'],
+  },
+}
+
+/** そのジャンルに合う広告があれば返す。無ければ空。 */
+function renderGenreAd(slug) {
+  const ad = Object.values(GENRE_ADS).find((row) => row.slugs.includes(slug))
+  if (!ad) return ''
+
+  return `<section class="genre-ad">
+        <p class="pr">広告</p>
+        <a href="${escapeHtml(ad.url)}" target="_blank" rel="nofollow sponsored noopener">
+          <img src="${escapeHtml(ad.image)}" width="${ad.width}" height="${ad.height}"
+               alt="${escapeHtml(ad.name)}" loading="lazy" referrerpolicy="no-referrer" />
+        </a>
+        <p class="service-note">${escapeHtml(ad.name)}｜${escapeHtml(ad.note)}</p>
+      </section>`
+}
+
 // ジャンルページに並べる人数。騎乗位は上限なしで 1.4MB になっていた
 // （2026-09-03 実測）。全員への道は五十音索引が持っているので、
 // ここは「多く出ている方」に絞ってよい。
@@ -1216,6 +1293,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
         : ''}
       ${renderBanner(genre.slug)}
       <h2>出演本数の多い方</h2>
+      ${renderGenreAd(genre.slug)}
       <ol class="rank-list">${list}</ol>
       ${rows.length > shown.length
         ? `<p class="note">このジャンルに当てはまる方は${rows.length.toLocaleString('ja-JP')}人います。出演本数の多い${shown.length}人までを載せています。全員は <a href="/actress/">五十音索引</a> から探せます。</p>`
@@ -1709,6 +1787,10 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .related, .history { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
+.genre-ad { margin:0 0 20px; padding:12px 14px; border:1px solid #ecdfe2; border-radius:10px; background:#fffafb; }
+.genre-ad .pr { margin:0 0 6px; }
+.genre-ad img { display:block; max-width:100%; height:auto; border-radius:4px; }
+.genre-ad .service-note { display:block; margin-top:6px; }
 .fanza-services { margin:32px 0 0; padding:16px 18px; border:1px solid #ecdfe2; border-radius:10px; background:#fffafb; }
 .fanza-services h2 { margin:0 0 10px; font-size:15px; color:#5b4b52; display:flex; align-items:center; gap:8px; }
 .fanza-services ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px 20px; }
@@ -1780,7 +1862,8 @@ footer a { color:#8b4054; }
 .adult { font-weight:700; color:#b0453c; }
 @media (prefers-color-scheme: dark) {
   body { background:#16141a; color:#ece8f0; }
-  .profile, .thin, .chips a, .kana-nav a, .fanza-services { background:#211e28; }
+  .profile, .thin, .chips a, .kana-nav a, .fanza-services, .genre-ad { background:#211e28; }
+  .genre-ad { border-color:#332d3d; }
   .fanza-services { border-color:#332d3d; }
   .fanza-services h2 { color:#d8d2df; }
   .fanza-services a { color:#f0908a; }
@@ -2552,6 +2635,9 @@ async function main() {
     { name: '大人のおもちゃ', href: '/goods/', note: 'メーカーから探す' },
     ...FANZA_SERVICES.map((service) => ({
       name: service.name, href: fanzaLink(service.url), note: service.note, external: true,
+    })),
+    ...OTHER_SERVICES.map((service) => ({
+      name: `${service.name}（${service.asp}）`, href: service.url, note: service.note, external: true,
     })),
   ]
 
