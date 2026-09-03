@@ -55,6 +55,14 @@ function useSearchIndex() {
   return { index, loading, load }
 }
 
+// 出演者ページと同じアフィリエイトリンクの作り。
+// af_id は静的ページ側（scripts/build-site.mjs）と同じものを使う。
+const FANZA_AFFILIATE_ID = 'syunnda1-997'
+
+function fanzaLink(target) {
+  return `https://al.fanza.co.jp/?lurl=${encodeURIComponent(target)}&af_id=${FANZA_AFFILIATE_ID}&ch=api`
+}
+
 function App() {
   const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const [featured, setFeatured] = useState(null)
@@ -340,6 +348,27 @@ function App() {
         <p>
           <a href="mailto:info@darekore.jp">info@darekore.jp</a>
         </p>
+      </section>
+
+      {/* FANZA の、作品APIに出てこないサービス。ライブチャットとくじは
+          ItemList に入っていないので作品単位のリンクが作れない。入口へ送る。
+          URLは実際に叩いて題名で確かめたもの（2026-09-03）。 */}
+      <section className="fanza-services">
+        <h2>
+          FANZA の他のサービス<span className="pr">広告</span>
+        </h2>
+        <ul>
+          <li>
+            <a href={fanzaLink('https://www.dmm.co.jp/live/chat/-/search/')}
+               target="_blank" rel="nofollow sponsored noopener">FANZAライブチャット</a>
+            <span className="service-note">いま配信中の女性を探せます</span>
+          </li>
+          <li>
+            <a href={fanzaLink('https://www.dmm.co.jp/kuji/')}
+               target="_blank" rel="nofollow sponsored noopener">FANZAオンラインくじ</a>
+            <span className="service-note">グッズが当たるオンラインくじです</span>
+          </li>
+        </ul>
       </section>
 
       <footer className="site-footer">

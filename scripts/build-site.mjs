@@ -92,6 +92,46 @@ function fanzaLink(target) {
   return `https://al.fanza.co.jp/?lurl=${encodeURIComponent(target)}&af_id=${FANZA_AFFILIATE_ID}&ch=api`
 }
 
+/**
+ * FANZA の、作品APIに出てこないサービス。
+ *
+ * ライブチャットとくじは ItemList に無い。**作品単位のリンクが作れない**ので、
+ * サービスの入口へ送る。URLは実際に叩いて題名で確かめたもの（2026-09-03）。
+ *
+ *   ライブチャット  https://www.dmm.co.jp/live/chat/-/search/  「女の子検索（全フロア） - FANZAライブチャット」
+ *   オンラインくじ  https://www.dmm.co.jp/kuji/                「FANZAオンラインくじ」
+ *
+ * **バナーは使わない。** 以前バナーを15枚入れて、中身が特定商品の
+ * キャンペーンだったため全部外した。ここは行き先が変わらない入口なので、
+ * 文字リンクで足りる。
+ */
+const FANZA_SERVICES = [
+  {
+    key: 'live',
+    name: 'FANZAライブチャット',
+    url: 'https://www.dmm.co.jp/live/chat/-/search/',
+    note: 'いま配信中の女性を探せます',
+  },
+  {
+    key: 'kuji',
+    name: 'FANZAオンラインくじ',
+    url: 'https://www.dmm.co.jp/kuji/',
+    note: 'グッズが当たるオンラインくじです',
+  },
+]
+
+/** FANZA の他サービスへの案内。全ページの下に置く。 */
+function renderFanzaServices() {
+  const items = FANZA_SERVICES
+    .map((service) => `<li><a href="${fanzaLink(service.url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(service.name)}</a><span class="service-note">${escapeHtml(service.note)}</span></li>`)
+    .join('')
+
+  return `<section class="fanza-services">
+        <h2>FANZA の他のサービス<span class="pr">広告</span></h2>
+        <ul>${items}</ul>
+      </section>`
+}
+
 function fanzaItemLink(cid) {
   return fanzaLink(`https://video.dmm.co.jp/av/content/?id=${cid}`)
 }
@@ -802,6 +842,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
                data-api="${escapeHtml(SUPABASE_URL)}"
                data-key="${escapeHtml(SUPABASE_ANON_KEY)}"></section>
       ${relatedHtml}
+      ${renderFanzaServices()}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
@@ -1507,6 +1548,7 @@ function shell({ title, description, canonical, crumbs, body, noindex = false })
       <header class="site-head"><a class="site-name" href="/">${escapeHtml(SITE_NAME)}</a></header>
       <nav class="crumbs"><a href="/">${escapeHtml(SITE_NAME)}</a> ＞ ${crumbs}</nav>
       ${body}
+      ${renderFanzaServices()}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。</p>
@@ -1581,6 +1623,13 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .related, .history { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
+.fanza-services { margin:32px 0 0; padding:16px 18px; border:1px solid #ecdfe2; border-radius:10px; background:#fffafb; }
+.fanza-services h2 { margin:0 0 10px; font-size:15px; color:#5b4b52; display:flex; align-items:center; gap:8px; }
+.fanza-services ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px 20px; }
+.fanza-services li { display:flex; align-items:baseline; gap:8px; font-size:14px; }
+.fanza-services a { color:#8b4054; font-weight:700; text-decoration:none; }
+.fanza-services a:hover { text-decoration:underline; }
+.service-note { color:#8a838f; font-size:13px; }
 .kana-nav { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 24px; }
 .kana-nav a, .kana-nav .current { color:#8b4054; text-decoration:none; font-size:14px; border:1px solid #ecdfe2; border-radius:8px; padding:6px 12px; background:#fff; }
 .kana-nav .current { background:#8b4054; color:#fff; border-color:#8b4054; }
@@ -1645,7 +1694,10 @@ footer a { color:#8b4054; }
 .adult { font-weight:700; color:#b0453c; }
 @media (prefers-color-scheme: dark) {
   body { background:#16141a; color:#ece8f0; }
-  .profile, .thin, .chips a, .kana-nav a { background:#211e28; }
+  .profile, .thin, .chips a, .kana-nav a, .fanza-services { background:#211e28; }
+  .fanza-services { border-color:#332d3d; }
+  .fanza-services h2 { color:#d8d2df; }
+  .fanza-services a { color:#f0908a; }
   .profile th { background:#272230; color:#b8b1c2; }
   .profile th, .profile td, .profile, .thin, .chips a, .kana-nav a { border-color:#332d3d; }
   .name-list a { color:#ded8e6; }
