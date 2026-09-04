@@ -404,6 +404,32 @@ function mgsSearchLink(word) {
     + `&form=mgs_asp_linktool_${code}`
 }
 
+// 駿河屋アフィリエイトの user_id。**空のときはリンクを出さない。**
+// リポジトリには書かず、GitHub Secrets の SURUGAYA_AFFILIATE_ID から渡す。
+//
+// `af_jump.php?user_id=...&goods_url=<URL>` で駿河屋の任意のページへ送れる。
+// **商品単位にはできない。** 商品ページのURLを集めるには駿河屋を
+// なめる必要があるが、robots.txt が Crawl-delay: 30 なので現実的でない。
+// MGS と同じく「この方の名前で検索した結果」へ送る。
+//
+// **中古を扱う店なので、絶版の作品では新品の店より当たる。**
+//
+// 棚（2026-09-04 に avsoft_ad.html から拾った）
+//   30701（+adult_s=3）  成年向け実写映像
+//   1100                 同人誌
+const SURUGAYA_AFFILIATE_ID = process.env.SURUGAYA_AFFILIATE_ID || ''
+
+function surugayaSearchLink(word, category, adult = true) {
+  if (!SURUGAYA_AFFILIATE_ID) return ''
+
+  const target = `https://www.suruga-ya.jp/search?category=${category}`
+    + `&search_word=${encodeURIComponent(word)}${adult ? '&adult_s=3' : ''}`
+
+  return 'https://affiliate.suruga-ya.jp/modules/af/af_jump.php'
+    + `?user_id=${encodeURIComponent(SURUGAYA_AFFILIATE_ID)}`
+    + `&goods_url=${encodeURIComponent(target)}`
+}
+
 // ソクミルの紹介ID。これもリンクに現れる公開の値。
 const SOKMIL_AFFILIATE_ID = process.env.SOKMIL_AFFILIATE_ID || '25173-001'
 
@@ -809,6 +835,12 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const mgs = mgsSearchLink(person.name)
   if (mgs) {
     works.push([`MGS動画 で「${person.name}」の作品を探す`, mgs])
+  }
+
+  // 駿河屋は中古を扱う。**絶版になった作品は、ここでしか買えないことがある。**
+  const surugaya = surugayaSearchLink(person.name, 30701)
+  if (surugaya) {
+    works.push([`駿河屋 で「${person.name}」の中古を探す`, surugaya])
   }
 
   if (person.b10f?.productUrl) {
@@ -1685,6 +1717,13 @@ function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
         <h2>DLsite の作品<span class="pr">広告</span></h2>
         ${renderDlsiteWorks(entry.dlsite.w)}
       </section>`
+        : ''}
+      ${kind === 'circle' && surugayaSearchLink(entry.name, 1100)
+        ? `<p class="works"><a href="${escapeHtml(surugayaSearchLink(entry.name, 1100))}"
+             target="_blank" rel="nofollow sponsored noopener">駿河屋 で「${escapeHtml(entry.name)}」の同人誌を探す</a>
+           <span class="pr">広告</span></p>
+        <p class="confirmed">駿河屋のリンクは<strong>検索した結果</strong>へつながります。
+           中古を扱う店なので、頒布が終わった本が見つかることがあります。</p>`
         : ''}
       <section class="source-block">
         <h2>出典</h2>

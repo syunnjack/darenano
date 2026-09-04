@@ -46,6 +46,8 @@ jobs:
           SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
           # 未設定なら MGS のリンクは出ない。
           MGS_AFFILIATE_CODE: ${{ secrets.MGS_AFFILIATE_CODE }}
+          # 駿河屋アフィリエイトの user_id。**未設定ならリンクを出さない。**
+          SURUGAYA_AFFILIATE_ID: ${{ secrets.SURUGAYA_AFFILIATE_ID }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
