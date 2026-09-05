@@ -105,12 +105,21 @@ function fanzaLink(target) {
  * キャンペーンだったため全部外した。ここは行き先が変わらない入口なので、
  * 文字リンクで足りる。
  */
+// **単価順に並べる。** 4つを同じ扱いで並べていたが、報酬が10倍違う。
+//
+//   FANZAライブチャット   サービス新規 5,240円
+//   FANZAオンラインくじ   ダイレクト     500円
+//
+// サービス新規は「そのサービスに初めて登録した人」に出る。
+// FANZAの動画を使っている人でも、**ライブチャットが未登録なら成果になる。**
+// この名鑑を見に来るのは動画の利用者なので、ライブチャットとは相性がよい。
 const FANZA_SERVICES = [
   {
     key: 'live',
     name: 'FANZAライブチャット',
     url: 'https://www.dmm.co.jp/live/chat/-/search/',
-    note: 'いま配信中の女性を探せます',
+    note: 'いま配信している方を探せます。録画ではなく、その場でやりとりできます',
+    lead: true,
   },
   {
     key: 'kuji',
@@ -155,20 +164,27 @@ const OTHER_SERVICES = [
 
 /** サービスへの案内。全ページの下に置く。 */
 function renderFanzaServices() {
-  const items = [
+  const all = [
     ...FANZA_SERVICES.map((service) => ({ ...service, href: fanzaLink(service.url) })),
     ...OTHER_SERVICES.map((service) => ({ ...service, href: service.url })),
   ]
-    .map((service) => `<li><a href="${escapeHtml(service.href)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(service.name)}</a><span class="service-note">${escapeHtml(service.note)}</span>${
-      service.pixel
-        ? `<img src="${escapeHtml(service.pixel)}" width="1" height="1" alt="" loading="lazy" referrerpolicy="no-referrer" />`
-        : ''
-    }</li>`)
-    .join('')
+
+  const item = (service) => `<li${service.lead ? ' class="lead-service"' : ''}>`
+    + `<a href="${escapeHtml(service.href)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(service.name)}</a>`
+    + `<span class="service-note">${escapeHtml(service.note)}</span>`
+    + (service.pixel
+      ? `<img src="${escapeHtml(service.pixel)}" width="1" height="1" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+      : '')
+    + '</li>'
+
+  // **先頭のものだけ、説明を読める大きさで置く。**
+  // 4つを同じ扱いで並べると、報酬が10倍違うものが同じ重みになる。
+  const lead = all.filter((service) => service.lead)
+  const rest = all.filter((service) => !service.lead)
 
   return `<section class="fanza-services">
         <h2>ライブチャット・くじなど<span class="pr">広告</span></h2>
-        <ul>${items}</ul>
+        <ul>${lead.map(item).join('')}${rest.map(item).join('')}</ul>
       </section>`
 }
 
@@ -1934,6 +1950,10 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .genre-ad .service-note { display:block; margin-top:6px; }
 .fanza-services { margin:32px 0 0; padding:16px 18px; border:1px solid #ecdfe2; border-radius:10px; background:#fffafb; }
 .fanza-services h2 { margin:0 0 10px; font-size:15px; color:#5b4b52; display:flex; align-items:center; gap:8px; }
+.fanza-services .lead-service { padding:10px 12px; margin:0 0 8px; background:#fff;
+  border:1px solid #ecdfe2; border-radius:8px; }
+.fanza-services .lead-service a { font-weight:700; font-size:15px; }
+.fanza-services .lead-service .service-note { display:block; margin-top:2px; }
 .fanza-services ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px 20px; }
 .fanza-services li { display:flex; align-items:baseline; gap:8px; font-size:14px; }
 .fanza-services a { color:#8b4054; font-weight:700; text-decoration:none; }
