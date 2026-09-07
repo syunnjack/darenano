@@ -16,6 +16,8 @@ public/doujin/
 public/circle/
 public/goods/
 public/author/
+# 実店舗ページ（scripts/build-shops.mjs が data/shops.json から生成する）
+public/shop/
 # FANZA のフロア別の入口（作者データから生成する）
 public/comic/
 public/novel/

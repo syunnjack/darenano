@@ -8,7 +8,7 @@
 //
 // 使い方: node scripts/build-site.mjs
 
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { merge, normaliseName, normaliseReading } from './lib/merge.mjs'
@@ -2897,6 +2897,19 @@ async function main() {
 
   // サイトマップには、中身のあるページだけを入れる。
   const today = new Date().toISOString().slice(0, 10)
+
+  // 実店舗ページは scripts/build-shops.mjs が作る。**あちらを先に走らせること**
+  // （package.json の prebuild でそうしてある）。まだ無ければ黙って飛ばす。
+  const shopUrls = []
+  try {
+    const kids = await readdir(path.join(publicDir, 'shop'), { withFileTypes: true })
+    shopUrls.push(`${SITE_URL}/shop/`)
+    for (const kid of kids) {
+      if (kid.isDirectory()) shopUrls.push(`${SITE_URL}/shop/${kid.name}/`)
+    }
+  } catch {
+    // 実店舗ページを作っていない環境では何もしない
+  }
   // changefreq と priority は Google が見ていないので入れない（3.3MB → 1.2MB になる）。
   const entries = [
     `${SITE_URL}/`,
@@ -2910,6 +2923,7 @@ async function main() {
     ...goodsUrls,
     ...authorUrls,
     ...floorUrls,
+    ...shopUrls,
     `${SITE_URL}/privacy/`,
     ...kanaUrls,
     ...indexable.map((p) => `${SITE_URL}/actress/${encodeURI(p.slug)}/`),
@@ -2926,7 +2940,7 @@ async function main() {
     const rest = url.slice(`${SITE_URL}/`.length)
     const head = rest.split('/')[0]
     return ['actress', 'circle', 'author', 'series', 'label', 'doujin', 'genre', 'goods', 'kana',
-      'comic', 'novel', 'pcgame', 'monopcgame', 'book', 'fanza']
+      'comic', 'novel', 'pcgame', 'monopcgame', 'book', 'fanza', 'shop']
       .includes(head) ? head : 'main'
   }
 
