@@ -135,6 +135,7 @@ ${schema.map((s) => `    <script type="application/ld+json">${jsonLd(s)}</script
         <nav class="site-nav">
           <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
           <a href="/shop/">実店舗</a>
+          <a href="/shop/kaitori/">買取</a>
           <a href="/actress/">五十音索引</a>
           <a href="/genre/">ジャンル別</a>
           <a href="/goods/">大人のおもちゃ</a>
@@ -217,6 +218,11 @@ function renderIndexPage(groups, total, confirmedOn) {
       <p class="lead">${escapeHtml(where)}にある店を、<strong>各社の公式サイトから確認して</strong>
         まとめています。${total}店。</p>
       ${cards}
+      <section class="related">
+        <h2>売りたいとき</h2>
+        <p>買取を受け付けている店だけを<a href="/shop/kaitori/">こちら</a>にまとめています。
+          持ち込みと宅配のちがい、必要な身分証も書いています。</p>
+      </section>
       <section class="source-block">
         <h2>載せていない店があります</h2>
         <p><strong>公式サイトで住所を確認できなかった店は載せていません。</strong>
@@ -238,6 +244,70 @@ function renderIndexPage(groups, total, confirmedOn) {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: SITE_NAME, item: ORIGIN },
         { '@type': 'ListItem', position: 2, name: '実店舗', item: `${ORIGIN}/shop/` },
+      ],
+    }],
+  })
+}
+
+/** 買取をやっている店だけを集めた入口。**探し方が「売りたい」で始まる人向け。** */
+function renderKaitoriPage(groups, confirmedOn) {
+  const rows = groups.map(({ group, shops }) => {
+    const buying = shops.filter((s) => s.buys)
+    if (!buying.length) return ''
+    const ways = [...new Set(buying.map((s) => s.buys))].join(' / ')
+    return `<section class="shop">
+        <h3><a href="/shop/${group.slug}/">${escapeHtml(group.name)}</a></h3>
+        <p>${buying.length}店で買取をしています。方法は${escapeHtml(ways)}。</p>
+        <p class="confirmed">${escapeHtml(buying.map((s) => s.name).join('、'))}</p>
+      </section>`
+  }).join('')
+
+  const total = groups.reduce((sum, g) => sum + g.shops.filter((s) => s.buys).length, 0)
+
+  const body = `<h1>買取をやっている実店舗</h1>
+      <p class="lead">愛知で、DVDや本の買取を受け付けている店です。${total}店。
+        <strong>各社の公式サイトに買取の案内があることを確認したものだけ</strong>を載せています。</p>
+      ${rows}
+      <section class="source-block">
+        <h2>持ち込みと宅配のちがい</h2>
+        <p><strong>持ち込みは、その日のうちに終わります。</strong>目の前で査定されるので、
+          金額に納得できなければ持ち帰れます。ただし、値段の付かなかったものは
+          そのまま返されるので、<strong>家に持ち帰ることになります。</strong></p>
+        <p><strong>宅配買取は、家から出ずに済みます。</strong>箱に詰めて集荷を待つだけです。
+          量が多いとき、運ぶ手段がないときはこちらが現実的です。
+          ただし申し込みから入金まで日数がかかります。</p>
+        <p>三國書店は、この2つに加えて<strong>「処分（廃棄）」</strong>も公式に案内しています。
+          売るのではなく、家から出すことが目的なら、その選択肢もあります。</p>
+      </section>
+      <section class="source-block">
+        <h2>身分証が要ります</h2>
+        <p>どの店でも<strong>本人確認書類の提示を求められます。</strong>
+          店の方針ではなく古物営業法で決まっていることなので、店を変えても同じです。
+          運転免許証やマイナンバーカードを持って行ってください。</p>
+        <p><strong>買取価格の相場は書きません。</strong>作品・状態・時期で変わるうえ、
+          根拠を示せる調査がないためです。金額は各店に問い合わせてください。</p>
+        <p class="confirmed">確認日: ${escapeHtml(confirmedOn)}</p>
+      </section>
+      <section class="related">
+        <h2>売る前に調べる</h2>
+        <p>手元の作品に誰が出ているかは<a href="/actress/">五十音索引</a>から引けます。
+          店の場所と営業時間は<a href="/shop/">実店舗一覧</a>にまとめています。</p>
+      </section>`
+
+  return page({
+    title: `買取をやっている実店舗｜${SITE_NAME}`,
+    description: `愛知でDVDや本の買取を受け付けている実店舗${total}店。`
+      + `持ち込みと宅配のちがい、必要な身分証をまとめています（${confirmedOn}時点）。`,
+    canonical: `${ORIGIN}/shop/kaitori/`,
+    crumbs: `<a href="/">${escapeHtml(SITE_NAME)}</a> ＞ <a href="/shop/">実店舗</a> ＞ 買取`,
+    body,
+    schema: [{
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: SITE_NAME, item: ORIGIN },
+        { '@type': 'ListItem', position: 2, name: '実店舗', item: `${ORIGIN}/shop/` },
+        { '@type': 'ListItem', position: 3, name: '買取', item: `${ORIGIN}/shop/kaitori/` },
       ],
     }],
   })
@@ -273,6 +343,18 @@ async function main() {
   await mkdir(outDir, { recursive: true })
   await writeFile(path.join(outDir, 'index.html'),
     renderIndexPage(filled, shops.length, data.confirmedOn), 'utf8')
+
+  // **買取をやっている店だけの入口。** 「売りたい」で探す人は
+  // 店名ではなく用途で探すので、チェーン別の一覧では見つけられない。
+  const buying = filled.filter(({ shops: rows }) => rows.some((s) => s.buys))
+  if (buying.length) {
+    const dir = path.join(outDir, 'kaitori')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'index.html'),
+      renderKaitoriPage(buying, data.confirmedOn), 'utf8')
+    const count = buying.reduce((sum, g) => sum + g.shops.filter((s) => s.buys).length, 0)
+    console.log(`  /shop/kaitori/  ${count}店`)
+  }
 
   console.log(`/shop/ と ${filled.length}枚のチェーンページを書き出しました（${shops.length}店）。`)
 }
