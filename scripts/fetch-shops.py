@@ -19,8 +19,12 @@
     アジト                azito.nagoya       2店
     三國書店              mikunisyoten.com   **アダルトDVD買取をやっている**
 
-**匠書店の公式（cstakumi.blog.fc2.com）は404。** 載せない。
-出典が示せない店は落とす。名前だけのページは作らない。
+    匠書店                takumi-dvd.shop    **宅配買取もやっている**。屋号が複数ある
+
+**アジト（azito.nagoya）は取らない。** アクセスページが地図画像だけで、
+住所が文字になっていない。出典が示せない店は落とす。名前だけのページは作らない。
+
+**旧公式の cstakumi.blog.fc2.com は404。** 現在は takumi-dvd.shop。
 
 ## 出力
 
@@ -265,6 +269,55 @@ def mikuni():
     return rows
 
 
+def takumi():
+    """匠書店（takumi-dvd.shop）。**1ページに全店が同じ並びで載っている。**
+
+        店名 | 営業時間: 12:00 ～ 26:00 | 年中無休 | 愛知県名古屋市南区 | 本地通4丁目2-1 | TEL ...
+
+    住所が「市区」と「番地」の2つに割れているので、続けて拾ってつなぐ。
+    DVD匠書店・綾波書店・匠書店壱見屋と屋号が混ざるが、同じ会社の店として扱う。
+    """
+    url = 'https://takumi-dvd.shop/'
+    html = fetch(url)
+    time.sleep(PAUSE)
+    if not html:
+        return []
+    text = plain(html)
+
+    buys = ''
+    guide = fetch('https://takumi-dvd.shop/howto')
+    time.sleep(PAUSE)
+    if guide and '宅配' in guide:
+        buys = '店頭買取・宅配買取'
+    elif guide:
+        buys = '店頭買取'
+
+    rows, seen = [], set()
+    # **空の区切りが挟まる。** `店名 | | 営業時間:` のように並ぶので、
+    # 単純に `\|` でつなぐと1件も当たらない。
+    sep = r'\s*\|(?:\s*\|)*\s*'
+    pattern = (r'([^|]{2,22}店)' + sep + r'営業時間\s*[:：]\s*([^|]{3,30})' + sep
+               + r'([^|]{0,12})' + sep + r'(愛知県[^|]{2,20})' + sep
+               + r'([^|]{1,30})' + sep + r'TEL\s*([\d\-]{9,14})')
+    for match in re.finditer(pattern, text):
+        name = tidy(match.group(1))
+        if name in seen or name.endswith('MAPで見る'):
+            continue
+        seen.add(name)
+        rows.append({
+            # **屋号が3つある**（DVD匠書店・綾波書店・あきば書店・匠書店壱見屋）。
+            # 同じ会社の店なので、まとめて匠書店グループとして扱う。
+            'chain': '匠書店', 'name': name, 'zip': '',
+            'address': tidy(match.group(4)) + tidy(match.group(5)),
+            'access': '', 'tel': tidy(match.group(6)),
+            'hours': tidy(match.group(2)), 'closed': tidy(match.group(3)),
+            'parking': '', 'items': '', 'buys': buys,
+            'site': url, 'source': url,
+        })
+        print(f'  匠書店 {name}', file=sys.stderr)
+    return rows
+
+
 def azito():
     """アジト（azito.nagoya）は取らない。
 
@@ -279,7 +332,7 @@ def azito():
 def main():
     shops = []
     for label, func in [('零式書店', zeroshiki), ('マックスグループ', videomax),
-                        ('三國書店', mikuni), ('アジト', azito)]:
+                        ('三國書店', mikuni), ('匠書店', takumi), ('アジト', azito)]:
         print(label, file=sys.stderr)
         shops.extend(func())
 
