@@ -12,6 +12,7 @@
 // 使い方: node scripts/build-shops.mjs
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -62,6 +63,33 @@ const GROUPS = [
       + '店頭持ち込み・宅配買取・処分の3通りを公式に案内している。',
   },
 ]
+
+// 広告枠。**出すものが無ければ枠ごと出さない。**（build-site.mjs と同じ data/ads.json）
+const adBlocks = (() => {
+  try {
+    return JSON.parse(readFileSync(path.join(root, 'data', 'ads.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+})()
+
+function renderBanner(slot) {
+  const block = adBlocks[slot]
+  if (!block || !block.html) return ''
+  return `<aside class="banner"><span class="pr">広告</span><div class="ad-slot">${block.html}</div></aside>`
+}
+
+/** 全自動広告のタグ。**ページ全体に広告が入る**ので head に1つだけ置く。 */
+function autoAdTag() {
+  const block = adBlocks.auto
+  return block && block.html ? block.html : ''
+}
+
+/** 自動広告を入れたページには、広告があることを断る。
+ *  **場所も枚数もこちらで決められない**ので、個別の「広告」表示だけでは足りない。 */
+function autoAdNotice() {
+  return autoAdTag() ? '<p class="adult">このページには第三者配信の広告が含まれます。</p>' : ''
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -123,6 +151,7 @@ ${schema.map((s) => `    <script type="application/ld+json">${jsonLd(s)}</script
     <script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>
     <link rel="stylesheet" href="/actress/page.css" />
+    ${autoAdTag()}
   </head>
   <body>
     <div class="wrap">
@@ -131,6 +160,7 @@ ${schema.map((s) => `    <script type="application/ld+json">${jsonLd(s)}</script
       ${body}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
+        ${autoAdNotice()}
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
         <nav class="site-nav">
           <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
@@ -174,6 +204,7 @@ function renderGroupPage(group, shops, confirmedOn) {
           確かめてください。</p>
         <p class="confirmed">確認日: ${escapeHtml(confirmedOn)}</p>
       </section>
+      ${renderBanner('shop')}
       <section class="related">
         <h2>店に行かずに探す</h2>
         <p>出演者の名前から作品を探すなら<a href="/actress/">五十音索引</a>、

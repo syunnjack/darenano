@@ -9,6 +9,8 @@
 // 使い方: node scripts/build-site.mjs
 
 import { mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises'
+// 広告枠は起動時に1度読むだけなので同期でよい。
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { merge, normaliseName, normaliseReading } from './lib/merge.mjs'
@@ -37,52 +39,34 @@ const FANZA_AFFILIATE_ID = process.env.FANZA_AFFILIATE_ID || 'syunnda1-997'
 
 // FANZA のバナー（ウィジェット）。ライブチャットやくじのように
 // ItemList API が無いサービスは、これでしか出せない。
+// 広告枠は data/ads.json で決める。
 //
-// **アフィリエイトIDが作品リンクとは別**（-011 と -997）。
-// ウィジェット用に発行されたものなので、混ぜない。
+// **DMM のバナーウィジェットはやめた。** 一度15枚を並べたが、実際に表示して
+// alt を読んだところ「『素。』奈良岡にこ ヘアヌード版写真集 配信開始」のような
+// **特定商品のキャンペーン広告**だった。出演者ページにもジャンルページにも、
+// すでに FANZA・DUGA・ソクミル・B10F の作品単位リンクが並んでいる。
+// そこに無関係な商品の広告を足すと、目当てに近いリンクの邪魔になるうえ、
+// キャンペーンが終われば古くなる。
 //
-// URL の & は &amp; と書く。素の & は実体参照として解釈されうる。
-const BANNER_AFFILIATE_ID = 'syunnda1-011'
-const BANNER_IDS = [
-  // **中身を確かめずに増やさない。** 一度15枚を並べたが、実際に表示して
-  // alt を読んだところ「『素。』奈良岡にこ ヘアヌード版写真集 配信開始」の
-  // ような**特定商品のキャンペーン広告**だった。
-  //
-  // 出演者ページもジャンルページも、すでに FANZA・DUGA・ソクミル・B10F の
-  // 作品単位リンクが並んでいる。そこに無関係な商品の広告を足すと、
-  // 目当てに近いリンクの邪魔になるうえ、キャンペーンが終われば古くなる。
-  //
-  // **ここに入れてよいのは、ページの目当てに近く、かつ API で出せないものだけ。**
-  // ライブチャット（いま配信中の人）が該当する。届いたら入れる。
-]
-
-/** ページごとに1枚だけ割り当てる。
- *
- * **1ページに何枚も並べない。** 広告だらけのページは読む人にも
- * 検索エンジンにも嫌われる。ページの名前から決めるので、
- * 同じページを開き直しても同じ広告が出る（毎回変わると落ち着かない）。
- */
-function bannerFor(key) {
-  let hash = 0
-  for (const char of String(key ?? '')) {
-    hash = (hash * 31 + char.codePointAt(0)) % 100000
+// **1ページに何枚も並べない。** 広告だらけのページは読む人にも
+// 検索エンジンにも嫌われる。
+//
+// **タグはサイトごとに違う。** darekore.jp 用に発行したものだけを入れる。
+const adBlocks = (() => {
+  try {
+    return JSON.parse(readFileSync(path.join(root, 'data', 'ads.json'), 'utf8'))
+  } catch {
+    return {}
   }
+})()
 
-  return BANNER_IDS[hash % BANNER_IDS.length]
-}
-
-/** バナーを、広告と分かる形で置く。 */
-function renderBanner(key) {
-  // 出すものが無ければ何も出さない。空の枠を作らない。
-  if (!BANNER_IDS.length) return ''
-
-  const bannerId = bannerFor(key)
-  const src = 'https://widget-view.dmm.co.jp/js/banner_placement.js'
-    + `?affiliate_id=${BANNER_AFFILIATE_ID}&amp;banner_id=${bannerId}`
+/** バナーを、広告と分かる形で置く。**出すものが無ければ枠ごと出さない。** */
+function renderBanner(slot) {
+  const block = adBlocks[slot]
+  if (!block || !block.html) return ''
 
   return '<aside class="banner"><span class="pr">広告</span>'
-    + '<ins class="widget-banner"></ins>'
-    + `<script class="widget-banner-script" src="${src}"></script>`
+    + `<div class="ad-slot">${block.html}</div>`
     + '</aside>'
 }
 
@@ -1008,7 +992,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         <p class="confirmed">各サービスの API が公開している情報をそのまま載せています。取得時期は<a href="/actress/">五十音索引</a>に記載しています。</p>
       </section>
       ${historyHtml}
-      ${renderBanner(person.slug)}
+      ${renderBanner('actress')}
       <section id="ugc" class="ugc"
                data-slug="${escapeHtml(person.slug)}"
                data-api="${escapeHtml(SUPABASE_URL)}"
@@ -1392,7 +1376,7 @@ function renderGenrePage(genre, rows, confirmedOn) {
             <p class="confirmed">FANZA の大人のおもちゃ 21,027件を「${escapeHtml(genre.name)}」で検索し、<strong>題名にその語が入っている商品だけ</strong>を出しています。作品のジャンル分類とは別のものです。</p>
           </section>`
         : ''}
-      ${renderBanner(genre.slug)}
+      ${renderBanner('genre')}
       <h2>出演本数の多い方</h2>
       ${renderAd(`genre:${genre.slug}`)}
       <ol class="rank-list">${list}</ol>
@@ -1937,6 +1921,9 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .banner { display:flex; flex-direction:column; align-items:center; gap:6px; margin:28px 0; }
 .banner .pr { align-self:flex-start; }
 .banner ins { display:block; max-width:100%; }
+/* 広告タグは中身の大きさが読めないので、はみ出しだけ止める。 */
+.banner .ad-slot { display:block; max-width:100%; overflow:hidden; }
+.banner .ad-slot img, .banner .ad-slot iframe { max-width:100%; height:auto; }
 .source-block { margin-top:34px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .sources { padding-left:1.2em; font-size:14px; color:#5a5566; margin:8px 0; }
 .sources a { color:#8b4054; }
