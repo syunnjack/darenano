@@ -8,5 +8,9 @@
   },
   "shop": {
     "html": ""
+  },
+  "auto": {
+    "_what": "忍者AdMax の全自動広告枠。ページ全体に広告が挿入されるので、場所と枚数はこちらで決められない。入れたページには必ず広告の断りを出すこと。",
+    "html": "<script async src=\"https://adm.shinobi.jp/st/auto.js\" data-admax-id=\"bdf5cd65e37becd8282be46917a510d0\"></script>"
   }
 }

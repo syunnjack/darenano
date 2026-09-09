@@ -79,6 +79,18 @@ function renderBanner(slot) {
   return `<aside class="banner"><span class="pr">広告</span><div class="ad-slot">${block.html}</div></aside>`
 }
 
+/** 全自動広告のタグ。**ページ全体に広告が入る**ので head に1つだけ置く。 */
+function autoAdTag() {
+  const block = adBlocks.auto
+  return block && block.html ? block.html : ''
+}
+
+/** 自動広告を入れたページには、広告があることを断る。
+ *  **場所も枚数もこちらで決められない**ので、個別の「広告」表示だけでは足りない。 */
+function autoAdNotice() {
+  return autoAdTag() ? '<p class="adult">このページには第三者配信の広告が含まれます。</p>' : ''
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -139,6 +151,7 @@ ${schema.map((s) => `    <script type="application/ld+json">${jsonLd(s)}</script
     <script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>
     <link rel="stylesheet" href="/actress/page.css" />
+    ${autoAdTag()}
   </head>
   <body>
     <div class="wrap">
@@ -147,6 +160,7 @@ ${schema.map((s) => `    <script type="application/ld+json">${jsonLd(s)}</script
       ${body}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
+        ${autoAdNotice()}
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
         <nav class="site-nav">
           <a href="/">${escapeHtml(SITE_NAME)} トップ</a>
