@@ -12,6 +12,7 @@
 // 使い方: node scripts/build-shops.mjs
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -62,6 +63,21 @@ const GROUPS = [
       + '店頭持ち込み・宅配買取・処分の3通りを公式に案内している。',
   },
 ]
+
+// 広告枠。**出すものが無ければ枠ごと出さない。**（build-site.mjs と同じ data/ads.json）
+const adBlocks = (() => {
+  try {
+    return JSON.parse(readFileSync(path.join(root, 'data', 'ads.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+})()
+
+function renderBanner(slot) {
+  const block = adBlocks[slot]
+  if (!block || !block.html) return ''
+  return `<aside class="banner"><span class="pr">広告</span><div class="ad-slot">${block.html}</div></aside>`
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -174,6 +190,7 @@ function renderGroupPage(group, shops, confirmedOn) {
           確かめてください。</p>
         <p class="confirmed">確認日: ${escapeHtml(confirmedOn)}</p>
       </section>
+      ${renderBanner('shop')}
       <section class="related">
         <h2>店に行かずに探す</h2>
         <p>出演者の名前から作品を探すなら<a href="/actress/">五十音索引</a>、
