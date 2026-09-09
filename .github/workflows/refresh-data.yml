@@ -97,7 +97,12 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/genres.json public/data/published-slugs.txt public/data/published-pages.txt
+          # **indexed-slugs.txt と lastmod.tsv も commit する。** 前者は
+          # 「一度検索に載せたページを noindex に落とさない」ための記録、
+          # 後者は「中身が変わった日」の記録で、どちらも前回の内容と
+          # 突き合わせて使う。commit しないと記録が増えず、
+          # 仕組みがあるのに効かない状態になる。
+          git add public/data/actresses.json public/data/duga-performers.json public/data/duga-products.json public/data/sokmil.json public/data/genres.json public/data/published-slugs.txt public/data/published-pages.txt public/data/indexed-slugs.txt public/data/kept-indexed.txt public/data/lastmod.tsv
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "データに変化はありませんでした。"
