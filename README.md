@@ -236,6 +236,23 @@ FANZA_API_ID=xxx FANZA_AFFILIATE_ID=yyy python scripts/fetch-genres.py public/da
 出演本数はFANZAの動画に限った数で、他社で配信された作品は含まない。
 その旨をページに書いてある。
 
+## サイトマップの lastmod
+
+**`<lastmod>` は、そのページの中身が最後に変わった日を出す。**
+以前は8.5万件すべてにビルド当日の日付を入れていた。全URLが毎回そろって
+「今日更新」と言えば、Google は lastmod を当てにしなくなり、変わっていない
+ページの取り直しに巡回が使われる。
+
+`scripts/build-site.mjs` が、書き出したHTMLのハッシュを
+`public/data/lastmod.tsv`（`パス / ハッシュ / 日付`）に記録し、前回と同じ
+ハッシュのページは前回の日付を据え置く。取得日（`confirmedOn`）は
+ページの中身ではないので、ハッシュを取る前に外している。
+
+**このファイルは commit する。** 記録が無いと全URLが当日に戻り、
+仕組みがあるのに効かない。`refresh-data.yml` の `git add` に入れてある。
+`indexed-slugs.txt`（一度検索に載せたページを noindex に落とさないための
+記録）も同じ理由で commit する。
+
 ## 削除依頼
 
 ご本人・関係者から掲載を希望しない旨の連絡を受けたら削除する。

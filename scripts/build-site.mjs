@@ -11,6 +11,7 @@
 import { mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises'
 // 広告枠は起動時に1度読むだけなので同期でよい。
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { merge, normaliseName, normaliseReading } from './lib/merge.mjs'
@@ -762,7 +763,9 @@ function renderGoods(items) {
 }
 
 function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks, moreWorks }) {
-  const canonical = `${SITE_URL}/actress/${person.slug}/`
+  // サイトマップは encodeURI で書き出しているので、canonical も同じ形にする。
+  // どちらも同じURLを指すが、二通りの書き方を渡す理由が無い。
+  const canonical = `${SITE_URL}/actress/${encodeURI(person.slug)}/`
   const reading = person.reading ? `（${person.reading}）` : ''
   const title = `${person.name}${reading}のプロフィール｜${SITE_NAME}`
 
@@ -945,7 +948,13 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         .join('')}</div></section>`
     : ''
 
-  const robots = indexable ? '' : '<meta name="robots" content="noindex,follow" />\n    '
+  // **載せるページには max-image-preview:large を出す。** 既定の standard は
+  // 検索結果に小さな枠しか出さない。名前で探している人にとっては写真が
+  // 決め手なので、出せる大きさで出す（神木麗さんのページは 1,334表示で
+  // 9クリック＝CTR 0.67%、2026-09-03）。載せないページはこれまでどおり。
+  const robots = indexable
+    ? '<meta name="robots" content="index,follow,max-image-preview:large" />\n    '
+    : '<meta name="robots" content="noindex,follow" />\n    '
 
   return `<!doctype html>
 <html lang="ja">
@@ -964,6 +973,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:url" content="${canonical}" />
+    ${photo ? `<meta property="og:image" content="${escapeHtml(photo)}" />` : ''}
     <meta name="twitter:card" content="summary" />
     <script type="application/ld+json">${jsonLd(personSchema)}</script>
     <script type="application/ld+json">${jsonLd(breadcrumbSchema)}</script>
@@ -1026,7 +1036,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
 
 /** 旧URLに置く転送ページ。GitHub Pages はサーバ側の転送ができないため。 */
 function renderRedirect(person) {
-  const target = `/actress/${person.slug}/`
+  const target = `/actress/${encodeURI(person.slug)}/`
 
   return `<!doctype html>
 <html lang="ja">
@@ -2188,35 +2198,6 @@ async function main() {
     indexedBefore = new Set(published)
   }
 
-  const usedSlugs = new Set()
-  for (const person of people) {
-    let slug = slugify(person.name)
-    let suffix = 2
-    while (usedSlugs.has(slug)) {
-      slug = `${slugify(person.name)}-${suffix}`
-      suffix += 1
-    }
-    usedSlugs.add(slug)
-    person.slug = slug
-    person.profile = profileOf(person)
-    person.naturallyIndexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL)
-    person.indexable = person.naturallyIndexable || indexedBefore.has(slug)
-  }
-
-  const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
-  const targets = people.filter((p) => p.indexable || published.has(p.slug))
-
-  // 読みの行ごとにまとめる（関連リンクと索引ページに使う）。
-  const rows = new Map()
-  for (const person of targets) {
-    const row = kanaHead(person.reading)
-    if (!rows.has(row)) rows.set(row, [])
-    rows.get(row).push(person)
-  }
-  for (const members of rows.values()) {
-    members.sort((a, b) => (a.reading || a.name).localeCompare(b.reading || b.name, 'ja'))
-  }
-
   // FANZA の作品データ。出演者ごとの出演作品と、シリーズ・レーベル別ページのもと。
   // まだ取っていないときは、無いまま作る（これまでどおりのページになる）。
   let fanzaWorksOf = new Map()
@@ -2256,6 +2237,47 @@ async function main() {
     console.log(`DTI CASH の作品: ${dtiWorksOf.size.toLocaleString('ja-JP')}人ぶん（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
   } catch {
     console.log('DTI CASH の作品データが無いので、出演作品は並べません。')
+  }
+
+  const usedSlugs = new Set()
+  for (const person of people) {
+    let slug = slugify(person.name)
+    let suffix = 2
+    while (usedSlugs.has(slug)) {
+      slug = `${slugify(person.name)}-${suffix}`
+      suffix += 1
+    }
+    usedSlugs.add(slug)
+    person.slug = slug
+    person.profile = profileOf(person)
+
+    // **出演作品の並びも「中身」として数える。** これまでは
+    // プロフィール欄・DUGA/B10F の作品数・写真だけを見ていたので、
+    // 千堂まりあさんのように FANZA の作品が8本並んでいるページでも、
+    // プロフィール欄が空なら「名前しか分からない人」と同じ扱いだった。
+    // 表紙つきの作品一覧が出ているページは、名前だけのページではない。
+    const fanzaId = person.fanza?.dmmId ? String(person.fanza.dmmId) : ''
+    const listedWorks = (fanzaWorksOf.get(fanzaId)?.w?.length ?? 0)
+      + Object.values(moreWorksOf.get(fanzaId) ?? {}).reduce((n, w) => n + (Array.isArray(w) ? w.length : 0), 0)
+      + (person.sokmil?.sokmilId ? (sokmilWorksOf.get(String(person.sokmil.sokmilId))?.w?.length ?? 0) : 0)
+      + (dtiWorksOf.get(normaliseName(person.name))?.w?.length ?? 0)
+
+    person.naturallyIndexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL) || listedWorks > 0
+    person.indexable = person.naturallyIndexable || indexedBefore.has(slug)
+  }
+
+  const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
+  const targets = people.filter((p) => p.indexable || published.has(p.slug))
+
+  // 読みの行ごとにまとめる（関連リンクと索引ページに使う）。
+  const rows = new Map()
+  for (const person of targets) {
+    const row = kanaHead(person.reading)
+    if (!rows.has(row)) rows.set(row, [])
+    rows.get(row).push(person)
+  }
+  for (const members of rows.values()) {
+    members.sort((a, b) => (a.reading || a.name).localeCompare(b.reading || b.name, 'ja'))
   }
 
   await rm(outDir, { recursive: true, force: true })
@@ -2931,6 +2953,61 @@ async function main() {
       .includes(head) ? head : 'main'
   }
 
+  // **lastmod は、そのページの中身が最後に変わった日にする。**
+  // これまでは全URLにビルド当日の日付を入れていた。5万件を超えるURLが
+  // 毎回そろって「今日更新」と言えば、Google は lastmod を当てにしなくなり、
+  // 変わっていないページの取り直しに巡回が使われる。順位が落ちている
+  // いまは、巡回を「実際に変わったページ」へ向けたい。
+  //
+  // 書き出したHTMLのハッシュを取り、前回と同じものは前回の日付を据え置く。
+  // 取得日（confirmedOn など）はページの中身ではないので、ハッシュから外す。
+  const lastmodFile = path.join(publicDir, 'data/lastmod.tsv')
+  const lastmodBefore = new Map()
+  try {
+    const text = await readFile(lastmodFile, 'utf8')
+    for (const line of text.split('\n')) {
+      const [pathname, digest, date] = line.split('\t')
+      if (pathname && digest && date) lastmodBefore.set(pathname, { digest, date })
+    }
+  } catch {
+    // 初回は無くてよい。全URLが当日になる。
+  }
+
+  // 日付だけが違うページを「変わった」と数えないための除外。
+  const volatile = [confirmedOn, dugaConfirmed, today]
+    .filter(Boolean)
+    .map((value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const volatileRe = volatile.length ? new RegExp(volatile.join('|'), 'g') : null
+
+  const lastmodNow = new Map()
+  const lastmod = new Map()
+  let changed = 0
+  for (const url of new Set(entries)) {
+    const pathname = url.slice(SITE_URL.length)
+    let digest = ''
+    try {
+      const html = await readFile(path.join(publicDir, decodeURI(pathname), 'index.html'), 'utf8')
+      digest = createHash('sha1').update(volatileRe ? html.replace(volatileRe, '') : html).digest('hex').slice(0, 8)
+    } catch {
+      // ここで作っていないページ（トップは Vite が組み立てる）。当日にしておく。
+      lastmod.set(url, today)
+      continue
+    }
+
+    const before = lastmodBefore.get(pathname)
+    const date = before && before.digest === digest ? before.date : today
+    if (!before || before.digest !== digest) changed += 1
+    lastmod.set(url, date)
+    lastmodNow.set(pathname, { digest, date })
+  }
+
+  await writeFile(
+    lastmodFile,
+    `${[...lastmodNow].map(([pathname, v]) => `${pathname}\t${v.digest}\t${v.date}`).sort().join('\n')}\n`,
+    'utf8'
+  )
+  console.log(`中身が変わったページ: ${changed.toLocaleString('ja-JP')}件 / ${lastmodNow.size.toLocaleString('ja-JP')}件`)
+
   const bySection = new Map()
   for (const url of entries) {
     const key = sectionOf(url)
@@ -2944,7 +3021,7 @@ async function main() {
       const chunk = list.slice(part * SITEMAP_MAX, (part + 1) * SITEMAP_MAX)
       const name = part === 0 ? `sitemap-${section}.xml` : `sitemap-${section}-${part + 1}.xml`
       const body = chunk
-        .map((loc) => `  <url><loc>${loc}</loc><lastmod>${today}</lastmod></url>`)
+        .map((loc) => `  <url><loc>${loc}</loc><lastmod>${lastmod.get(loc) ?? today}</lastmod></url>`)
         .join('\n')
 
       await writeFile(
@@ -2952,14 +3029,19 @@ async function main() {
         `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`,
         'utf8'
       )
-      sitemapFiles.push({ name, count: chunk.length })
+      // 索引側の lastmod も、その束でいちばん新しい日にする。
+      const newest = chunk.reduce((max, loc) => {
+        const date = lastmod.get(loc) ?? today
+        return date > max ? date : max
+      }, '0000-00-00')
+      sitemapFiles.push({ name, count: chunk.length, lastmod: newest })
     }
   }
 
   await writeFile(
     path.join(publicDir, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapFiles
-      .map((f) => `  <sitemap><loc>${SITE_URL}/${f.name}</loc><lastmod>${today}</lastmod></sitemap>`)
+      .map((f) => `  <sitemap><loc>${SITE_URL}/${f.name}</loc><lastmod>${f.lastmod}</lastmod></sitemap>`)
       .join('\n')}\n</sitemapindex>\n`,
     'utf8'
   )
