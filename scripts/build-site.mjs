@@ -263,11 +263,12 @@ function renderAuthorPage(author, confirmedOn, thin = false) {
 }
 
 /** 作者の入口。 */
-function renderAuthorIndexPage(authors, confirmedOn) {
+function renderAuthorIndexPage(authors, confirmedOn, noindex = false) {
   const description = `FANZA のコミック・ノベル・PCゲーム・ブックから、`
     + `作品の多い作者 ${authors.length.toLocaleString('ja-JP')}人を並べています。`
 
   return shell({
+    noindex,
     title: `作者から探す（${authors.length.toLocaleString('ja-JP')}人）｜${SITE_NAME}`,
     description,
     canonical: `${SITE_URL}/author/`,
@@ -288,7 +289,7 @@ function renderAuthorIndexPage(authors, confirmedOn) {
  * 「PCゲームだけ見たい」「コミックだけ見たい」という辿り方ができなかった。
  * データは fanza-authors.json をそのまま使う（取り直しは要らない）。
  */
-function renderFloorIndexPage(kind, authors, newest, confirmedOn, page = 1, pages = 1) {
+function renderFloorIndexPage(kind, authors, newest, confirmedOn, page = 1, pages = 1, noindex = false) {
   const floor = AUTHOR_FLOORS[kind]
   const shown = authors.slice((page - 1) * GROUP_PER_PAGE, page * GROUP_PER_PAGE)
   const at = (n) => `/${kind}/${n === 1 ? '' : `${n}/`}`
@@ -311,6 +312,7 @@ function renderFloorIndexPage(kind, authors, newest, confirmedOn, page = 1, page
     : ''
 
   return shell({
+    noindex,
     title: `${floor.label}の作者から探す（${authors.length.toLocaleString('ja-JP')}人）`
       + `${pages > 1 ? `${page}ページ目` : ''}｜${SITE_NAME}`,
     description,
@@ -1526,8 +1528,39 @@ const GROUP_KINDS = {
   label: { path: 'label', nav: 'レーベル別', unit: 'レーベル' },
 }
 
+/**
+ * **索引に載せる軸を、出演者を探す役に立つものに絞る。**
+ *
+ * 8/21 から 9/4 のあいだに、出演者ページ 59,445件へ重ねて、同人サークル
+ * 10,710・作者 6,554・シリーズ 6,225・レーベル 1,767・同人ジャンル 500・
+ * 大人のおもちゃ 111 を出した。サーチコンソールに出るクリックは
+ * 出演者名の検索ばかりで、この軸のページは拾えていない
+ * （28日でクリック144・表示4,720、2026-09-09 時点）。
+ *
+ * このサイトは「出演者の名前から探せる名鑑」。同人サークル・作者・
+ * 大人のおもちゃには出演者が入らず、名鑑としては別のものになる。
+ * 検索エンジンに 8.5万URL を見せて、そのうち2割が別の話題では、
+ * 巡回も評価も薄まる。
+ *
+ * **ページは消さない。** 見に来た人には使えるし、出演者ページへの
+ * 通り道でもある。noindex,follow にして索引とサイトマップから外し、
+ * 巡回と評価を出演者ページへ寄せる。出演者ページが戻ったら、
+ * ここを true にして軸ごとに戻せる。
+ */
+const SECTION_INDEXED = {
+  circle: false,    // 同人サークル
+  doujin: false,    // 同人のジャンル
+  author: false,    // 作者（コミック・ノベル・PCゲーム・ブック）
+  goods: false,     // 大人のおもちゃ
+}
+
+// シリーズ・レーベルは出演者が並ぶので残す。ただし、このサイトに
+// ページのある出演者がこれより少ないものは、名鑑としての行き先に
+// ならないので載せない。
+const GROUP_MIN_CAST = 5
+
 /** シリーズ別・レーベル別のページ。収録作品と、そこに出ている方を並べる。 */
-function renderGroupPage(kind, entry, cast, confirmedOn) {
+function renderGroupPage(kind, entry, cast, confirmedOn, thin = false) {
   const meta = GROUP_KINDS[kind]
   const canonical = `${SITE_URL}/${meta.path}/${entry.id}/`
 
@@ -1542,6 +1575,7 @@ function renderGroupPage(kind, entry, cast, confirmedOn) {
     : ''
 
   return shell({
+    noindex: thin,
     title: `${entry.name}の収録作品｜${SITE_NAME}`,
     description,
     canonical,
@@ -1748,7 +1782,7 @@ function renderDoujinPage(kind, entry, confirmedOn, thin = false) {
 }
 
 /** 同人の入口。 */
-function renderDoujinIndex(kind, entries, confirmedOn, page = 1, pages = 1) {
+function renderDoujinIndex(kind, entries, confirmedOn, page = 1, pages = 1, noindex = false) {
   const meta = DOUJIN_KINDS[kind]
   const shown = entries.slice((page - 1) * GROUP_PER_PAGE, page * GROUP_PER_PAGE)
   const at = (n) => `/${meta.path}/${n === 1 ? '' : `${n}/`}`
@@ -1764,6 +1798,7 @@ function renderDoujinIndex(kind, entries, confirmedOn, page = 1, pages = 1) {
     : ''
 
   return shell({
+    noindex,
     title: `${meta.nav}（${entries.length.toLocaleString('ja-JP')}${meta.unit}）`
       + `${pages > 1 ? `${page}ページ目` : ''}｜${SITE_NAME}`,
     description,
@@ -1780,12 +1815,13 @@ function renderDoujinIndex(kind, entries, confirmedOn, page = 1, pages = 1) {
 }
 
 /** 大人のおもちゃのメーカー別ページ。 */
-function renderGoodsMakerPage(maker, confirmedOn) {
+function renderGoodsMakerPage(maker, confirmedOn, noindex = false) {
   const canonical = `${SITE_URL}/goods/${maker.id}/`
   const description = `${maker.name}の大人のおもちゃ ${maker.n.toLocaleString('ja-JP')}件のうち、`
     + `新しい${maker.w.length}件を並べています。`
 
   return shell({
+    noindex,
     title: `${maker.name}の大人のおもちゃ｜${SITE_NAME}`,
     description,
     canonical,
@@ -1806,11 +1842,12 @@ function renderGoodsMakerPage(maker, confirmedOn) {
 }
 
 /** 大人のおもちゃの入口。ジャンルからも、メーカーからも辿れるようにする。 */
-function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn) {
+function renderGoodsIndexPage(makers, genres, newest, scanned, confirmedOn, noindex = false) {
   const description = `FANZA の大人のおもちゃ ${scanned.toLocaleString('ja-JP')}件から、`
     + `ジャンル ${genres.length}件・メーカー ${makers.length}社ぶんの入口を作っています。`
 
   return shell({
+    noindex,
     title: `大人のおもちゃ（${scanned.toLocaleString('ja-JP')}商品）｜${SITE_NAME}`,
     description,
     canonical: `${SITE_URL}/goods/`,
@@ -2534,6 +2571,7 @@ async function main() {
   // 作品数の少ないものはページにしない（表紙が数枚だけの薄いページを増やさないため）。
   const GROUP_MIN_WORKS = { series: 8, label: 30 }
   const groupUrls = []
+  let groupThin = 0
   let hasNewPage = false
 
   const slugOfDmmId = new Map(
@@ -2568,10 +2606,15 @@ async function main() {
         .sort((a, b) => b.works - a.works || a.person.name.localeCompare(b.person.name, 'ja'))
         .map((row) => ({ name: row.person.name, slug: row.person.slug, works: row.works }))
 
+      // 出演者の行き先が少ないページは、名鑑としては役に立たない。
+      // ページは残したまま、索引とサイトマップから外す。
+      const thin = cast.length < GROUP_MIN_CAST
+      if (thin) groupThin += 1
+
       const target = path.join(dir, entry.id)
       await mkdir(target, { recursive: true })
-      await writeFile(path.join(target, 'index.html'), renderGroupPage(kind, entry, cast, confirmedOn), 'utf8')
-      groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/${entry.id}/`)
+      await writeFile(path.join(target, 'index.html'), renderGroupPage(kind, entry, cast, confirmedOn, thin), 'utf8')
+      if (!thin) groupUrls.push(`${SITE_URL}/${GROUP_KINDS[kind].path}/${entry.id}/`)
     }
 
     if (entries.length) {
@@ -2586,7 +2629,8 @@ async function main() {
       }
 
       console.log(`${GROUP_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`
-        + `（入口 ${indexPages}ページ）`)
+        + `（入口 ${indexPages}ページ / 出演者が${GROUP_MIN_CAST}人未満で索引に載せない ${groupThin.toLocaleString('ja-JP')}ページ）`)
+      groupThin = 0
     }
   }
 
@@ -2674,7 +2718,7 @@ async function main() {
     for (const entry of entries) {
       const target = path.join(dir, entry.id)
       await mkdir(target, { recursive: true })
-      const thin = entry.n < DOUJIN_INDEX_MIN[kind]
+      const thin = !SECTION_INDEXED[DOUJIN_KINDS[kind].path] || entry.n < DOUJIN_INDEX_MIN[kind]
       await writeFile(path.join(target, 'index.html'), renderDoujinPage(kind, entry, confirmedOn, thin), 'utf8')
       if (!thin) doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${entry.id}/`)
     }
@@ -2685,9 +2729,10 @@ async function main() {
       for (let page = 1; page <= indexPages; page += 1) {
         const target = page === 1 ? dir : path.join(dir, String(page))
         await mkdir(target, { recursive: true })
+        const indexThin = !SECTION_INDEXED[DOUJIN_KINDS[kind].path]
         await writeFile(path.join(target, 'index.html'),
-          renderDoujinIndex(kind, entries, confirmedOn, page, indexPages), 'utf8')
-        doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${page === 1 ? '' : `${page}/`}`)
+          renderDoujinIndex(kind, entries, confirmedOn, page, indexPages, indexThin), 'utf8')
+        if (!indexThin) doujinUrls.push(`${SITE_URL}/${DOUJIN_KINDS[kind].path}/${page === 1 ? '' : `${page}/`}`)
       }
 
       console.log(`同人 ${DOUJIN_KINDS[kind].nav}: ${entries.length.toLocaleString('ja-JP')}ページ`
@@ -2715,8 +2760,8 @@ async function main() {
     for (const maker of makers) {
       const target = path.join(dir, maker.id)
       await mkdir(target, { recursive: true })
-      await writeFile(path.join(target, 'index.html'), renderGoodsMakerPage(maker, confirmedOn), 'utf8')
-      goodsUrls.push(`${SITE_URL}/goods/${maker.id}/`)
+      await writeFile(path.join(target, 'index.html'), renderGoodsMakerPage(maker, confirmedOn, !SECTION_INDEXED.goods), 'utf8')
+      if (SECTION_INDEXED.goods) goodsUrls.push(`${SITE_URL}/goods/${maker.id}/`)
     }
 
     // ジャンルからも入れるようにする。名前は genres.json の並びに合わせる。
@@ -2726,10 +2771,10 @@ async function main() {
 
     await writeFile(
       path.join(dir, 'index.html'),
-      renderGoodsIndexPage(makers, genreLinks, goodsFile.newest ?? [], goodsFile.scanned ?? 0, confirmedOn),
+      renderGoodsIndexPage(makers, genreLinks, goodsFile.newest ?? [], goodsFile.scanned ?? 0, confirmedOn, !SECTION_INDEXED.goods),
       'utf8'
     )
-    goodsUrls.push(`${SITE_URL}/goods/`)
+    if (SECTION_INDEXED.goods) goodsUrls.push(`${SITE_URL}/goods/`)
 
     console.log(`大人のおもちゃ: メーカー ${makers.length}ページ + 入口`)
   } catch {
@@ -2762,7 +2807,7 @@ async function main() {
     for (const author of authors) {
       const target = path.join(dir, author.id)
       await mkdir(target, { recursive: true })
-      const thin = author.n < AUTHOR_INDEX_MIN
+      const thin = !SECTION_INDEXED.author || author.n < AUTHOR_INDEX_MIN
       await writeFile(path.join(target, 'index.html'), renderAuthorPage(author, confirmedOn, thin), 'utf8')
       if (!thin) authorUrls.push(`${SITE_URL}/author/${author.id}/`)
     }
@@ -2770,8 +2815,8 @@ async function main() {
     if (authors.length) {
       // 入口が長くなりすぎないよう、多い順に上位だけ並べる
       await writeFile(path.join(dir, 'index.html'),
-        renderAuthorIndexPage(authors.slice(0, 2000), confirmedOn), 'utf8')
-      authorUrls.push(`${SITE_URL}/author/`)
+        renderAuthorIndexPage(authors.slice(0, 2000), confirmedOn, !SECTION_INDEXED.author), 'utf8')
+      if (SECTION_INDEXED.author) authorUrls.push(`${SITE_URL}/author/`)
       hasAuthorPages = true
       console.log(`作者: ${authors.length.toLocaleString('ja-JP')}ページ（見た作品 ${(file.scanned ?? 0).toLocaleString('ja-JP')}件）`)
     }
@@ -2815,9 +2860,10 @@ async function main() {
       for (let page = 1; page <= pages; page += 1) {
         const target = page === 1 ? dir : path.join(dir, String(page))
         await mkdir(target, { recursive: true })
+        // 中身は作者の一覧なので、作者ページと同じ扱いにする。
         await writeFile(path.join(target, 'index.html'),
-          renderFloorIndexPage(kind, authors, newest, confirmedOn, page, pages), 'utf8')
-        floorUrls.push(`${SITE_URL}/${kind}/${page === 1 ? '' : `${page}/`}`)
+          renderFloorIndexPage(kind, authors, newest, confirmedOn, page, pages, !SECTION_INDEXED.author), 'utf8')
+        if (SECTION_INDEXED.author) floorUrls.push(`${SITE_URL}/${kind}/${page === 1 ? '' : `${page}/`}`)
       }
 
       floorRows.push({
