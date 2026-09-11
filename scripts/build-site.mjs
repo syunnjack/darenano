@@ -36,7 +36,11 @@ const DUGA_AGENT_ID = process.env.DUGA_AGENT_ID || '21786'
 // FANZA のアフィリエイトID。API が返す一覧URLに現れる公開の値。
 // これまで作品単位のリンクが1本も無く、DMM アフィリエイトの
 // 「ダイレクト報酬」が構造的に発生しない状態だった。
-const FANZA_AFFILIATE_ID = process.env.FANZA_AFFILIATE_ID || 'syunnda1-997'
+//
+// **syunnda1-019 は darekore.jp（この子だれ？）として承認されたID**（2026-09-09）。
+// 以前の -997 は API を叩くために取った、サイトの紐づいていない登録で、
+// 掲載に使うのは参加規約 第7条の禁止行為にあたる。
+const FANZA_AFFILIATE_ID = process.env.FANZA_AFFILIATE_ID || 'syunnda1-019'
 
 // FANZA のバナー（ウィジェット）。ライブチャットやくじのように
 // ItemList API が無いサービスは、これでしか出せない。
