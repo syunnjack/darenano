@@ -790,7 +790,77 @@ function renderGoods(items) {
     .join('')}</ul>`
 }
 
-function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks, moreWorks }) {
+/**
+ * 数えられることだけを出す一枠。
+ *
+ * 2026-09-11 の GSC で「発見済み - 現在インデックス登録されていません」が
+ * 21,147件あった。**重複はわずか3件**で、Google は似ているから弾いたのではなく
+ * そもそも取りに来ていない。出演者ページの25%は 9KB 未満で、共通の枠が
+ * 7KB あるため、固有の中身が 2KB しかなかった。
+ *
+ * グラビア名鑑（guradol）で同じ手を打った出演者ページは表示が出ているので、
+ * 同じものを置く。**推測は書かない。** 各社の API が返した件数・日付・分類を
+ * 数えたものだけを出す。数え方の但し書きも一緒に出す。
+ */
+function renderTally(person, { tally, rank, genres, span, peers }) {
+  const blocks = []
+
+  if (tally?.rows?.length) {
+    const rows = tally.rows
+      .map(([label, count]) => `<tr><th>${escapeHtml(label)}</th><td>${count.toLocaleString('ja-JP')}作品</td></tr>`)
+      .join('')
+
+    const total = tally.rows.length > 1
+      ? `<tr class="total"><th>合計</th><td>${tally.total.toLocaleString('ja-JP')}作品</td></tr>`
+      : ''
+
+    blocks.push(`<h3>収録作品数</h3><table class="profile"><tbody>${rows}${total}</tbody></table>`)
+  }
+
+  if (rank) {
+    // **同じ件数の人は同じ順位にする。** 1作品の人が何万人もいるので、
+    // 順位だけ出すと「下位」に見えてしまう。同数が何人いるかも書く。
+    blocks.push(`<p class="tally-line">収録作品数は、ページのある方 ${rank.of.toLocaleString('ja-JP')}人のうち`
+      + ` <strong>${rank.place.toLocaleString('ja-JP')}位</strong>です`
+      + `（同じ ${rank.count.toLocaleString('ja-JP')}作品の方が ${rank.tied.toLocaleString('ja-JP')}人います）。</p>`)
+  }
+
+  if (span?.from) {
+    const range = span.from === span.to
+      ? escapeHtml(span.from)
+      : `${escapeHtml(span.from)} 〜 ${escapeHtml(span.to)}`
+
+    blocks.push(`<p class="tally-line">ページに出している ${span.works.toLocaleString('ja-JP')}本の発売・配信日は <strong>${range}</strong> です。`
+      + `<span class="note">各社から受け取るのは新しいものから数本までなので、活動していた期間そのものではありません。</span></p>`)
+  }
+
+  if (genres?.length) {
+    const chips = genres
+      .map((g) => `<a href="/genre/${escapeHtml(g.slug)}/">${escapeHtml(g.name)}<span class="chip-count">${g.works.toLocaleString('ja-JP')}</span></a>`)
+      .join('')
+
+    blocks.push(`<h3>出ている分類</h3><div class="chips">${chips}</div>`
+      + '<p class="note">各社が作品に付けている分類を、この方の出演本数で数えたものです。</p>')
+  }
+
+  if (peers?.rows?.length) {
+    const chips = peers.rows
+      .map((row) => `<a href="/actress/${escapeHtml(row.slug)}/">${escapeHtml(row.name)}</a>`)
+      .join('')
+
+    // **いちばん人数の少ない分類を選ぶ。** 大きい分類の上位を出すと、
+    // どのページにも同じ顔ぶれが並んでしまう。
+    blocks.push(`<h3>「${escapeHtml(peers.genre)}」に出ている方</h3><div class="chips">${chips}</div>`
+      + `<p class="note">この分類には ${peers.people.toLocaleString('ja-JP')}人が並んでいます。`
+      + `そのなかで出演本数の近い方です。</p>`)
+  }
+
+  if (!blocks.length) return ''
+
+  return `<section class="tally"><h2>収録の内訳</h2>${blocks.join('')}</section>`
+}
+
+function renderPage(person, { profile, sources, related, indexable, fanzaWorks, sokmilWorks, dtiWorks, moreWorks, tally }) {
   // サイトマップは encodeURI で書き出しているので、canonical も同じ形にする。
   // どちらも同じURLを指すが、二通りの書き方を渡す理由が無い。
   const canonical = `${SITE_URL}/actress/${encodeURI(person.slug)}/`
@@ -1018,6 +1088,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       ${person.reading ? `<p class="reading">読み: ${escapeHtml(person.reading)}</p>` : ''}
       <div class="lead-block">${photoHtml}${profileHtml}</div>
       ${worksHtml}
+      ${renderTally(person, tally ?? {})}
       ${fanzaWorksHtml}
       ${moreHtml}
       ${dugaWorksHtml}
@@ -2004,6 +2075,12 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .related, .history { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
+.chip-count { margin-left:6px; color:#8a838f; font-size:12px; }
+.tally { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.tally h3 { font-size:15px; margin:18px 0 8px; color:#6b6474; }
+.tally .profile tr.total th, .tally .profile tr.total td { background:#fdf6f7; font-weight:700; }
+.tally-line { font-size:14px; margin:10px 0 0; }
+.tally .note { display:block; font-size:13px; color:#8a838f; margin-top:4px; }
 .genre-ad { margin:0 0 20px; padding:12px 14px; border:1px solid #ecdfe2; border-radius:10px; background:#fffafb; }
 .genre-ad .pr { margin:0 0 6px; }
 .genre-ad img { display:block; max-width:100%; height:auto; border-radius:4px; }
@@ -2302,6 +2379,44 @@ async function main() {
     console.log('DTI CASH の作品データが無いので、出演作品は並べません。')
   }
 
+  // ジャンル。**ここで読む。** 出演者ページに「出ている分類」と
+  // 「同じ分類に出ている方」を出すのに要る（ページを書くのは後ろの方）。
+  // B10F のぶんを足すのは後ろのままなので、B10F にしか無い分類は
+  // 出演者ページの側には出てこない。
+  let genreList = []
+  try {
+    const file = await readJson(path.join(publicDir, 'data/genres.json'))
+    genreList = file.genres ?? []
+  } catch {
+    console.log('ジャンルのデータが無いので、ジャンル別ページは作りません。')
+  }
+
+  // 出演者 → 分類。genres.json が持っている performers を裏返しただけ。
+  const genresOfPerson = new Map()
+  const peopleInGenre = new Map()
+
+  for (const genre of genreList) {
+    const rows = [...(genre.performers ?? [])]
+      .sort((a, b) => b.works - a.works || a.name.localeCompare(b.name, 'ja'))
+
+    peopleInGenre.set(genre.slug, rows)
+
+    for (const row of rows) {
+      const key = normaliseName(row.name)
+      if (!genresOfPerson.has(key)) genresOfPerson.set(key, [])
+      genresOfPerson.get(key).push({
+        name: genre.name,
+        slug: genre.slug,
+        works: row.works,
+        people: rows.length,
+      })
+    }
+  }
+
+  if (genreList.length) {
+    console.log(`分類: ${genreList.length}件 / 出演者 ${genresOfPerson.size.toLocaleString('ja-JP')}人ぶん`)
+  }
+
   const usedSlugs = new Set()
   for (const person of people) {
     let slug = slugify(person.name)
@@ -2327,10 +2442,77 @@ async function main() {
 
     person.naturallyIndexable = person.profile.length > 0 || (person.duga?.works ?? 0) > 0 || (person.b10f?.works ?? 0) > 0 || Boolean(person.fanza?.image) || Boolean(person.sokmil?.imageURL) || listedWorks > 0
     person.indexable = person.naturallyIndexable || indexedBefore.has(slug)
+
+    // **収録作品数は、総数を返してくる出典だけを足す。**
+    // 他フロア（DVD・見放題・成人映画・写真集）は手元にある数本しか
+    // 分からないので、合計には入れない。
+    const counts = [
+      ['FANZA（動画）', fanzaWorksOf.get(fanzaId)?.n ?? 0],
+      ['DUGA', person.duga?.works ?? 0],
+      ['ソクミル', person.sokmil?.sokmilId ? (sokmilWorksOf.get(String(person.sokmil.sokmilId))?.n ?? 0) : 0],
+      ['B10F', person.b10f?.works ?? 0],
+      ['無修正（DTI CASH）', dtiWorksOf.get(normaliseName(person.name))?.n ?? 0],
+    ].filter(([, n]) => n > 0)
+
+    person.tallyRows = counts
+    person.totalWorks = counts.reduce((sum, [, n]) => sum + n, 0)
+
+    // ページに出している作品の発売・配信日。**活動期間ではない。**
+    const dates = [
+      ...(fanzaWorksOf.get(fanzaId)?.w ?? []),
+      ...Object.values(moreWorksOf.get(fanzaId) ?? {}).flat(),
+      ...(person.duga?.recent ?? []),
+      ...(person.sokmil?.sokmilId ? (sokmilWorksOf.get(String(person.sokmil.sokmilId))?.w ?? []) : []),
+      ...(person.b10f?.recent ?? []),
+    ]
+      .map((work) => String(work?.d ?? ''))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort()
+
+    person.span = dates.length
+      ? { from: monthLabel(dates[0]), to: monthLabel(dates[dates.length - 1]), works: dates.length }
+      : null
+
+    person.genres = (genresOfPerson.get(normaliseName(person.name)) ?? [])
+      .sort((a, b) => b.works - a.works || a.name.localeCompare(b.name, 'ja'))
   }
 
   const confirmedOn = fanzaFile.confirmedOn || dugaConfirmed || new Date().toISOString().slice(0, 10)
   const targets = people.filter((p) => p.indexable || published.has(p.slug))
+
+  // 収録作品数の順位。**同じ件数の人は同じ順位**にして、同数が何人いるかも持つ。
+  // 1作品の人が何万人もいるので、順位だけ出すと下位に見えてしまう。
+  const ranked = [...targets].filter((p) => p.totalWorks > 0).sort((a, b) => b.totalWorks - a.totalWorks)
+  const rankByWorks = new Map()
+
+  for (let index = 0; index < ranked.length; index += 1) {
+    const count = ranked[index].totalWorks
+    if (!rankByWorks.has(count)) rankByWorks.set(count, { place: index + 1, tied: 0, count })
+    rankByWorks.get(count).tied += 1
+  }
+
+  // 同じ分類に出ている方。**いちばん人数の少ない分類**を選ぶ。
+  // 大きい分類の上位を出すと、どのページにも同じ顔ぶれが並ぶ。
+  const slugByName = new Map(targets.map((p) => [normaliseName(p.name), p.slug]))
+
+  const peersOf = (person) => {
+    const mine = (person.genres ?? []).filter((g) => peopleInGenre.get(g.slug)?.length > 1)
+    if (!mine.length) return null
+
+    const genre = [...mine].sort((a, b) => a.people - b.people)[0]
+    const rows = peopleInGenre.get(genre.slug) ?? []
+    const at = rows.findIndex((row) => normaliseName(row.name) === normaliseName(person.name))
+    const start = Math.max(0, (at < 0 ? 0 : at) - 4)
+
+    // **自分を外すのはスラッグで見る。** 名前で突き合わせると、
+    // 分類の一覧に別名義で載っている自分を弾けない。
+    const near = rows.slice(start, start + 9)
+      .map((row) => ({ name: row.name, slug: slugByName.get(normaliseName(row.name)) || '' }))
+      .filter((row) => row.slug && row.slug !== person.slug)
+      .slice(0, 8)
+
+    return near.length ? { genre: genre.name, people: genre.people, rows: near } : null
+  }
 
   // 読みの行ごとにまとめる（関連リンクと索引ページに使う）。
   const rows = new Map()
@@ -2365,6 +2547,15 @@ async function main() {
       moreWorks: person.fanza?.dmmId ? moreWorksOf.get(String(person.fanza.dmmId)) : null,
       sokmilWorks: person.sokmil?.sokmilId ? sokmilWorksOf.get(String(person.sokmil.sokmilId)) : null,
       dtiWorks: dtiWorksOf.get(normaliseName(person.name)) ?? null,
+      tally: {
+        tally: person.tallyRows?.length ? { rows: person.tallyRows, total: person.totalWorks } : null,
+        rank: rankByWorks.has(person.totalWorks)
+          ? { ...rankByWorks.get(person.totalWorks), of: ranked.length }
+          : null,
+        genres: (person.genres ?? []).slice(0, 8),
+        span: person.span,
+        peers: peersOf(person),
+      },
     })
 
     const dir = path.join(outDir, person.slug)
@@ -2461,14 +2652,8 @@ async function main() {
   await mkdir(rankingDir, { recursive: true })
   await writeFile(path.join(rankingDir, 'index.html'), renderRankingPage(), 'utf8')
 
-  // ジャンル別ページ。FANZA動画のジャンルで、出演本数を数えたもの。
-  let genreList = []
-  try {
-    const file = await readJson(path.join(publicDir, 'data/genres.json'))
-    genreList = file.genres ?? []
-  } catch {
-    console.log('ジャンルのデータが無いので、ジャンル別ページは作りません。')
-  }
+  // ジャンル別ページ。**読み込みは出演者ページより前に済ませてある**
+  // （genreList は上で作った。出演者ページの「出ている分類」に要るため）。
 
   // B10F のタグ別集計を足す。名前が重なるジャンルだけ（fetch-b10f-csv.py の GENRE_TAGS）。
   if (genreList.length) {
