@@ -82,6 +82,28 @@ function fanzaLink(target) {
 }
 
 /**
+ * データに入っているアフィリエイトURLを、**いまのIDで貼り直す。**
+ *
+ * 同人とグッズは API が返した `affiliateURL` をそのまま保存しているので、
+ * 取得したときのIDが残る。承認前に取ったぶん（syunnda1-997）が
+ * 混ざったままだと、未申請サイトでのID利用にあたる。
+ *
+ * 行き先（`lurl`）は触らない。**IDを付け替えるだけ**で、
+ * 同じIDでAPIを叩いたときに返ってくるURLと同じものになる。
+ */
+function withCurrentId(url) {
+  if (typeof url !== 'string' || !url.includes('al.fanza.co.jp')) return url
+
+  try {
+    const parsed = new URL(url)
+    const target = parsed.searchParams.get('lurl')
+    return target ? fanzaLink(target) : url
+  } catch {
+    return url
+  }
+}
+
+/**
  * FANZA の、作品APIに出てこないサービス。
  *
  * ライブチャットとくじは ItemList に無い。**作品単位のリンクが作れない**ので、
@@ -758,7 +780,7 @@ function renderGoods(items) {
   if (!items?.length) return ''
 
   return `<ul class="work-list">${items
-    .map((item) => `<li class="work"><a href="${escapeHtml(item.u)}" target="_blank" rel="nofollow sponsored noopener">`
+    .map((item) => `<li class="work"><a href="${escapeHtml(withCurrentId(item.u))}" target="_blank" rel="nofollow sponsored noopener">`
       + (item.i
         ? `<img src="${escapeHtml(item.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="100" />`
         : '')
@@ -1691,7 +1713,7 @@ function renderDoujinWorks(works) {
   if (!works?.length) return ''
 
   return `<ul class="work-list">${works
-    .map((work) => `<li class="work"><a href="${escapeHtml(work.u)}" target="_blank" rel="nofollow sponsored noopener">`
+    .map((work) => `<li class="work"><a href="${escapeHtml(withCurrentId(work.u))}" target="_blank" rel="nofollow sponsored noopener">`
       + (work.i
         ? `<img src="${escapeHtml(work.i)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="100" height="141" />`
         : '')
