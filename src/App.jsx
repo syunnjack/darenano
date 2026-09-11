@@ -210,6 +210,35 @@ function App() {
         </ul>
         </section>
       )}
+      {/* **今月に作品が出た方。** 書き込みで埋めなくても、出典のデータだけで
+          サイトが動いていることは出せる。月は今日の日付ではなく、手元の
+          データにある最後の月。取得が止まっているのに「今月」と書かないため。 */}
+      {!searching && featured?.recent?.length > 0 && (
+        <section className="results" aria-label="新しい作品が出た方">
+          <h2>
+            {Number(featured.recentMonth.slice(5, 7))}月に作品が出た方
+          </h2>
+          <p className="section-note">
+            各社の作品データで、発売・配信日がいちばん新しいものが
+            {featured.recentMonth.slice(0, 4)}年{Number(featured.recentMonth.slice(5, 7))}月だった方です。
+            {featured.recentTotal.toLocaleString('ja-JP')}人のうち{featured.recent.length}人を出しています。
+          </p>
+          <ul className="name-list">
+            {featured.recent.map((person) => (
+              <li key={person.slug}>
+                <a href={`/actress/${person.slug}/`}>
+                  {person.name}
+                  {person.reading && <span className="reading">{person.reading}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="more">
+            <a href="/new/">新着作品を発売日の順に見る</a>
+          </p>
+        </section>
+      )}
+
       {!searching && ranking.length > 0 && (
         <section className="ranking-strip" aria-label="投票ランキング">
           <div className="ranking-head">

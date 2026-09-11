@@ -2521,6 +2521,9 @@ async function main() {
       ? { from: monthLabel(dates[0]), to: monthLabel(dates[dates.length - 1]), works: dates.length }
       : null
 
+    // いちばん新しい作品の発売・配信日。トップの「今月に作品が出た方」に使う。
+    person.latest = dates.length ? dates[dates.length - 1] : ''
+
     person.genres = (genresOfPerson.get(normaliseName(person.name)) ?? [])
       .sort((a, b) => b.works - a.works || a.name.localeCompare(b.name, 'ja'))
   }
@@ -3194,6 +3197,30 @@ async function main() {
       detailed: withProfile.length,
       // 出演作品数の多い方。DUGA の作品データCSVに記録された収録数で並べる。
       // 「人気」の順位は各社のAPIに無いので作らない。数えたのは DUGA のぶんだけ。
+      // **今月に作品が出た方。** 書き込みで埋めなくても、
+      // 出典のデータだけで「動いている」ことは出せる。
+      // 月は今日の日付ではなく、**手元のデータにある最後の月**で決める。
+      // 取得が止まっているのに「今月」と書くと嘘になるため。
+      ...(() => {
+        const months = targets.map((p) => p.latest.slice(0, 7)).filter(Boolean)
+        if (!months.length) return {}
+
+        const month = months.sort()[months.length - 1]
+        const rows = targets
+          .filter((p) => p.latest.slice(0, 7) === month)
+          .sort((a, b) => b.latest.localeCompare(a.latest) || a.name.localeCompare(b.name, 'ja'))
+
+        return {
+          recentMonth: month,
+          recentTotal: rows.length,
+          recent: rows.slice(0, 24).map((p) => ({
+            name: p.name,
+            reading: p.reading,
+            slug: p.slug,
+            on: p.latest,
+          })),
+        }
+      })(),
       mostWorks: targets
         .filter((p) => (p.duga?.works ?? 0) > 0)
         .sort((a, b) => (b.duga.works - a.duga.works) || a.name.localeCompare(b.name, 'ja'))
