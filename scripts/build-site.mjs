@@ -840,7 +840,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const works = []
 
   if (person.fanza?.listUrl) {
-    works.push(['FANZA で出演作品を見る', person.fanza.listUrl])
+    works.push(['FANZA で出演作品を見る', withCurrentId(person.fanza.listUrl)])
   }
 
   // DUGA には出演者ごとのページのURLが公式に無い（ウェブサービスのレスポンスにも
@@ -902,7 +902,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         ${renderWorkList(fanzaWorks.w)}
         <p class="confirmed">FANZA の動画（videoa）に収録されている ${fanzaWorks.n.toLocaleString('ja-JP')} 作品のうち、新しい ${fanzaWorks.w.length} 本です。${
           person.fanza?.listUrl
-            ? `<a href="${escapeHtml(person.fanza.listUrl)}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
+            ? `<a href="${escapeHtml(withCurrentId(person.fanza.listUrl))}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
             : ''
         }</p>
       </section>`
@@ -1152,7 +1152,7 @@ function renderHeadPage(head, members, confirmedOn, groups, page = 1, pages = 1)
   const links = shown
     .map((p) => {
       const shops = [
-        ['FANZA', p.fanza?.listUrl],
+        ['FANZA', withCurrentId(p.fanza?.listUrl)],
         ['ソクミル', p.sokmil?.affiliateURL],
         ['DUGA', p.duga?.productId
           ? `https://click.duga.jp/ppv/${encodeURIComponent(p.duga.productId)}/${DUGA_AGENT_ID}-01`
