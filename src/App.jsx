@@ -57,7 +57,9 @@ function useSearchIndex() {
 
 // 出演者ページと同じアフィリエイトリンクの作り。
 // af_id は静的ページ側（scripts/build-site.mjs）と同じものを使う。
-const FANZA_AFFILIATE_ID = 'syunnda1-997'
+// **syunnda1-019 は darekore.jp として承認されたID**（2026-09-09）。
+// ここだけ直し忘れると、トップページのリンクが未申請のIDのまま残る。
+const FANZA_AFFILIATE_ID = 'syunnda1-019'
 
 function fanzaLink(target) {
   return `https://al.fanza.co.jp/?lurl=${encodeURIComponent(target)}&af_id=${FANZA_AFFILIATE_ID}&ch=api`
