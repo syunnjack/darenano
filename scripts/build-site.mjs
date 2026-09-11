@@ -451,8 +451,11 @@ const SURUGAYA_AFFILIATE_ID = process.env.SURUGAYA_AFFILIATE_ID || ''
 function surugayaSearchLink(word, category, adult = true) {
   if (!SURUGAYA_AFFILIATE_ID) return ''
 
-  const target = `https://www.suruga-ya.jp/search?category=${category}`
-    + `&search_word=${encodeURIComponent(word)}${adult ? '&adult_s=3' : ''}`
+  // category を渡さなければ棚を絞らない検索になる。
+  // **確かめた棚しか使わない**ので、写真集やコミックはこちらで拾う。
+  const shelf = category ? `category=${category}&` : ''
+  const target = `https://www.suruga-ya.jp/search?${shelf}`
+    + `search_word=${encodeURIComponent(word)}${adult ? '&adult_s=3' : ''}`
 
   return 'https://affiliate.suruga-ya.jp/modules/af/af_jump.php'
     + `?user_id=${encodeURIComponent(SURUGAYA_AFFILIATE_ID)}`
@@ -790,6 +793,54 @@ function renderGoods(items) {
     .join('')}</ul>`
 }
 
+/** 名前で検索に送ってよいか。記号だけ・1文字の名前は空振りにしかならない。 */
+function searchableName(name) {
+  const value = String(name ?? '').trim()
+  return value.length >= 3 && !/^[ \-]+$/.test(value)
+}
+
+/**
+ * 中古で探せる先。**駿河屋だけ。**
+ *
+ * グラビア名鑑（guradol）は楽天市場と Yahoo!ショッピングの中古を
+ * 商品単位で並べているが、**こちらには置けない。**
+ * 楽天アフィリエイトが「アダルトサイトなど公序良俗に反する表現・内容を
+ * 含むサイト」への掲載を禁止しているため（2026-09-11 確認）。
+ * バリューコマース経由の Yahoo! も同じ扱いになる。
+ *
+ * 駿河屋は成年向けの棚を持っていて、アフィリエイトもそのまま使える。
+ * ただし**商品データを取る手段が無い**（robots.txt が Crawl-delay: 30）ので、
+ * 送れるのは検索した結果まで。特定の商品は指していないとページに書く。
+ *
+ * 棚は実際に叩いて確かめたものだけを使う。**IDを推測して足さない。**
+ * 空の検索結果に送るくらいなら、リンクを1本減らす。
+ */
+function renderUsed(person, { hasVideo }) {
+  if (!SURUGAYA_AFFILIATE_ID || !searchableName(person.name)) return ''
+
+  const links = []
+
+  if (hasVideo) {
+    links.push([`駿河屋 で「${person.name}」の映像ソフトを探す`, surugayaSearchLink(person.name, 30701)])
+  }
+
+  links.push([`駿河屋 で「${person.name}」を探す（棚を絞らない）`, surugayaSearchLink(person.name)])
+
+  const buttons = links
+    .filter(([, url]) => url)
+    .map(([label, url]) => `<a class="button" href="${escapeHtml(url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(label)}</a>`)
+    .join('')
+
+  if (!buttons) return ''
+
+  return `<section class="used"><h2>中古で探す<span class="pr">広告</span></h2>
+      <p class="works">${buttons}</p>
+      <p class="note">絶版になった作品は、新品を扱う店から消えていても中古なら残っていることがあります。
+      いずれも<strong>検索した結果</strong>へつながるもので、特定の商品を指してはいません。
+      品物の状態と在庫は行き先でご確認ください。</p>
+    </section>`
+}
+
 /**
  * 数えられることだけを出す一枠。
  *
@@ -938,12 +989,6 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
     works.push([`MGS動画 で「${person.name}」の作品を探す`, mgs])
   }
 
-  // 駿河屋は中古を扱う。**絶版になった作品は、ここでしか買えないことがある。**
-  const surugaya = surugayaSearchLink(person.name, 30701)
-  if (surugaya) {
-    works.push([`駿河屋 で「${person.name}」の中古を探す`, surugaya])
-  }
-
   if (person.b10f?.productUrl) {
     const opened = person.b10f.productOpenedOn
       ? `（${person.b10f.productOpenedOn.replace(/^(\d+)-(\d+)-(\d+)$/, (_m, y, m2, d) => `${Number(y)}年${Number(m2)}月${Number(d)}日配信`)}）`
@@ -1089,6 +1134,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
       <div class="lead-block">${photoHtml}${profileHtml}</div>
       ${worksHtml}
       ${renderTally(person, tally ?? {})}
+      ${renderUsed(person, { hasVideo: Boolean(fanzaWorks?.n) || Object.values(moreWorks ?? {}).some((w) => w?.length) })}
       ${fanzaWorksHtml}
       ${moreHtml}
       ${dugaWorksHtml}
@@ -2076,6 +2122,8 @@ h2 { font-size:18px; margin:32px 0 10px; }
 .chips { display:flex; flex-wrap:wrap; gap:8px; }
 .chips a { color:#8b4054; text-decoration:none; font-size:13px; border:1px solid #ecdfe2; border-radius:18px; padding:4px 12px; background:#fff; }
 .chip-count { margin-left:6px; color:#8a838f; font-size:12px; }
+.used { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
+.used .note { display:block; font-size:13px; color:#8a838f; margin-top:4px; }
 .tally { margin-top:30px; border-top:1px solid #ecdfe2; padding-top:8px; }
 .tally h3 { font-size:15px; margin:18px 0 8px; color:#6b6474; }
 .tally .profile tr.total th, .tally .profile tr.total td { background:#fdf6f7; font-weight:700; }
