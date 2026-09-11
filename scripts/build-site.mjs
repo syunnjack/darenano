@@ -3206,9 +3206,14 @@ async function main() {
         if (!months.length) return {}
 
         const month = months.sort()[months.length - 1]
+        // **同じ日の中は収録作品数の多い順。** 名前順にすると、
+        // 同じ日に何百人も並ぶので「あ」で始まる方が毎回上に来る。
+        // グラビア名鑑で分類ごとの並びに同じ失敗をしている。
         const rows = targets
           .filter((p) => p.latest.slice(0, 7) === month)
-          .sort((a, b) => b.latest.localeCompare(a.latest) || a.name.localeCompare(b.name, 'ja'))
+          .sort((a, b) => b.latest.localeCompare(a.latest)
+            || (b.totalWorks - a.totalWorks)
+            || a.name.localeCompare(b.name, 'ja'))
 
         return {
           recentMonth: month,
@@ -3218,6 +3223,7 @@ async function main() {
             reading: p.reading,
             slug: p.slug,
             on: p.latest,
+            works: p.totalWorks,
           })),
         }
       })(),

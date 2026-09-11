@@ -221,7 +221,9 @@ function App() {
           <p className="section-note">
             各社の作品データで、発売・配信日がいちばん新しいものが
             {featured.recentMonth.slice(0, 4)}年{Number(featured.recentMonth.slice(5, 7))}月だった方です。
-            {featured.recentTotal.toLocaleString('ja-JP')}人のうち{featured.recent.length}人を出しています。
+            {featured.recentTotal.toLocaleString('ja-JP')}人のうち、日付の新しい順・
+            収録作品数の多い順に{featured.recent.length}人を出しています。
+            作品数は各社の収録数を足したもので、同じ作品が複数社にあると重なって数えられます。
           </p>
           <ul className="name-list">
             {featured.recent.map((person) => (
@@ -229,6 +231,9 @@ function App() {
                 <a href={`/actress/${person.slug}/`}>
                   {person.name}
                   {person.reading && <span className="reading">{person.reading}</span>}
+                  {person.works > 0 && (
+                    <span className="reading">{person.works.toLocaleString('ja-JP')}作品</span>
+                  )}
                 </a>
               </li>
             ))}
