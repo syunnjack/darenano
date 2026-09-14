@@ -11,5 +11,7 @@ jobs:
         with: { python-version: '3.12' }
       - env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
-          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          # **API を叩くIDは -990〜-999 でないと 400 になる。**
+          # サイトのリンク用の承認済みID（-019）とは別物。
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_API_AFFILIATE_ID }}
         run: python scripts/probe-fanza-all-floors.py

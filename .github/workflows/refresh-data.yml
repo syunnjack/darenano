@@ -45,7 +45,9 @@ jobs:
       - name: FANZA の出演者を取り直す
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
-          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          # **API を叩くIDは -990〜-999 でないと 400 になる。**
+          # サイトのリンク用の承認済みID（-019）とは別物。
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_API_AFFILIATE_ID }}
         run: python scripts/fetch-actresses.py public/data/actresses.json
 
       # DUGA は全商品を見るのに数時間かかる。時間で切り上げて、
@@ -77,7 +79,9 @@ jobs:
       - name: ジャンル別の出演本数を数え直す
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
-          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          # **API を叩くIDは -990〜-999 でないと 400 になる。**
+          # サイトのリンク用の承認済みID（-019）とは別物。
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_API_AFFILIATE_ID }}
           DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
           DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
           SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}

@@ -40,7 +40,9 @@ jobs:
       - name: ジャンル別の出演本数を数え直す
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
-          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_AFFILIATE_ID }}
+          # **API を叩くIDは -990〜-999 でないと 400 になる。**
+          # サイトのリンク用の承認済みID（-019）とは別物。
+          FANZA_AFFILIATE_ID: ${{ secrets.FANZA_API_AFFILIATE_ID }}
           DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
           DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
           SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}
