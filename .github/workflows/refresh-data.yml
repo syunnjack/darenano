@@ -43,6 +43,7 @@ jobs:
           node-version: 24
 
       - name: FANZA の出演者を取り直す
+        timeout-minutes: 60
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
           # **API を叩くIDは -990〜-999 でないと 400 になる。**
@@ -54,20 +55,23 @@ jobs:
       # 途中経過（nextOffset つき）を commit しておく。次回の実行が続きから取る。
       - name: DUGA の出演者を取り直す（ウェブサービス。出演者IDと読み仮名のため）
         if: ${{ github.event_name == 'schedule' || inputs.duga }}
+        timeout-minutes: 130
         env:
           DUGA_APP_ID: ${{ secrets.DUGA_APP_ID }}
           DUGA_AGENT_ID: ${{ secrets.DUGA_AGENT_ID }}
-          DUGA_MAX_MINUTES: '240'
+          DUGA_MAX_MINUTES: '120'
         run: python scripts/fetch-duga-performers.py public/data/duga-performers.json
 
       # 作品データCSVは1回のダウンロードで済み、収録も広い。
       # 作品数と、リンク先にする代表作品はこちらから取る。認証は要らない。
       - name: DUGA の作品データCSVを取り込む
+        timeout-minutes: 25
         run: python scripts/fetch-duga-csv.py public/data/duga-products.json
 
       # ソクミルは連続で叩くと403を返す。1,000件ごとに保存し、
       # 止まっても次回の実行が続きから取る。
       - name: ソクミルの出演者を取り直す
+        timeout-minutes: 40
         env:
           SOKMIL_API_KEY: ${{ secrets.SOKMIL_API_KEY }}
           SOKMIL_AFFILIATE_ID: ${{ secrets.SOKMIL_AFFILIATE_ID }}
@@ -76,7 +80,11 @@ jobs:
 
       # ジャンル別の出演本数。3社ぶんで、ジャンル1つあたり10分ほどかかる。
       # ジャンルごとに書き出すので、途中で止まっても取れたぶんは残る。
+      # **上限を入れる。** ジャンル1つ10分 × 64ジャンルで、放っておくと
+      # 6時間を食い切って commit の前にジョブごと死ぬ。ジャンルごとに
+      # 書き出すので、切っても取れたぶんは残り、次回が続きから取る。
       - name: ジャンル別の出演本数を数え直す
+        timeout-minutes: 70
         env:
           FANZA_API_ID: ${{ secrets.FANZA_API_ID }}
           # **API を叩くIDは -990〜-999 でないと 400 になる。**
@@ -94,6 +102,7 @@ jobs:
       # 公開済みURLの記録（published-slugs.txt）を更新するために、ここでも生成しておく。
       # 生成したページ自体は .gitignore で除いてあるので commit されない。
       - name: ページを生成して、公開済みURLの記録を更新する
+        timeout-minutes: 20
         run: node scripts/build-site.mjs
 
       - name: 変化があれば commit する
