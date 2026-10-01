@@ -2319,6 +2319,39 @@ async function main() {
     sokmilAdded += 1
   }
 
+  // **DUGA の作品データを、全員に当て直す。**
+  //
+  // 作品データCSVは 45,219人ぶんあるのに、これまで `dugaRecords`（8,865人）の中に
+  // いる人にしか当てていなかった。**FANZA やソクミルから来た人は、名前が一致しても
+  // DUGA の作品が付かない。** 実測で、出演者ページ8件のうち6件に
+  // DUGA の商品リンクが1本も出ていなかった（2026-10-01）。
+  //
+  // `click.duga.jp/aff/api/` は規約で表示が義務づけられているクレジットで、
+  // 商品リンクではない。数えるときに混ぜない。
+  let dugaLateMatched = 0
+  for (const person of people) {
+    if (person.duga?.productId) continue          // すでに付いている人は触らない
+    const found = dugaProducts.get(normaliseName(person.name))
+    if (!found) continue
+
+    // **出演者IDは無い。** CSV から分かるのは作品のほうだけなので、
+    // 「DUGA の出演者ページ」へは送らず、作品ページだけを出す。
+    person.duga = {
+      ...(person.duga ?? {}),
+      name: found.name,
+      works: found.works,
+      productId: found.productId,
+      productOpenedOn: found.productOpenedOn,
+      firstOpenedOn: found.firstOpenedOn,
+      lastOpenedOn: found.lastOpenedOn,
+      labels: found.labels,
+      recent: found.recent ?? [],
+      fromCsvOnly: true,
+    }
+    dugaLateMatched += 1
+  }
+  console.log(`DUGA 作品データ: ${dugaProducts.size}人のうち ${dugaLateMatched}人を追加で結び付けました。`)
+
   // B10F。4社目の出典。ウェブサービスが無く、管理画面のカテゴリー別CSVだけ。
   // 出演者名が入っている作品が2割ほどしかないので、新しい人は足さず、
   // すでに他社で名前が分かっている人にだけ結び付ける。

@@ -66,6 +66,7 @@ https://darekore.jp/kana/%E3%81%8D/2/
 https://darekore.jp/kana/%E3%81%8D/3/
 https://darekore.jp/kana/%E3%81%8D/4/
 https://darekore.jp/kana/%E3%81%8D/5/
+https://darekore.jp/kana/%E3%81%8D/6/
 https://darekore.jp/kana/%E3%81%8F/
 https://darekore.jp/kana/%E3%81%8F/2/
 https://darekore.jp/kana/%E3%81%8F/3/
@@ -115,6 +116,7 @@ https://darekore.jp/kana/%E3%81%A4/2/
 https://darekore.jp/kana/%E3%81%A6/
 https://darekore.jp/kana/%E3%81%A8/
 https://darekore.jp/kana/%E3%81%A8/2/
+https://darekore.jp/kana/%E3%81%A8/3/
 https://darekore.jp/kana/%E3%81%AA/
 https://darekore.jp/kana/%E3%81%AA/2/
 https://darekore.jp/kana/%E3%81%AA/3/
@@ -135,6 +137,7 @@ https://darekore.jp/kana/%E3%81%AF/3/
 https://darekore.jp/kana/%E3%81%AF/4/
 https://darekore.jp/kana/%E3%81%AF/5/
 https://darekore.jp/kana/%E3%81%AF/6/
+https://darekore.jp/kana/%E3%81%AF/7/
 https://darekore.jp/kana/%E3%81%B2/
 https://darekore.jp/kana/%E3%81%B2/2/
 https://darekore.jp/kana/%E3%81%B2/3/
