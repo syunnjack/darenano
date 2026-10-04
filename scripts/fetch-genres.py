@@ -479,7 +479,12 @@ def main() -> None:
     links_only = os.environ.get('LINKS_ONLY') == '1'
     previous = {}
 
-    if (only or links_only) and output.exists():
+    # **前回の結果は常に読む。**
+    # 以前は only / links_only のときしか読んでいなかったため、全件実行が
+    # タイムアウトすると「今回処理できた分」だけが書き出され、それまでに
+    # 積み上げた分を消していた。2026-09-01 に64ジャンルあったものが
+    # 09-20 の実行で2ジャンルになったのはこれが原因。
+    if output.exists():
         try:
             for row in json.loads(output.read_text(encoding='utf-8')).get('genres', []):
                 previous[row['slug']] = row
@@ -487,8 +492,23 @@ def main() -> None:
         except Exception as error:
             print(f'前回の結果を読めませんでした（全部取り直します）: {error}', file=sys.stderr)
             only = set()
+            previous = {}
 
     result = []
+
+    def merged_rows() -> list:
+        """今回取れた分で前回分を上書きし、GENRES の順に返す。
+
+        **途中で止まっても、まだ処理していないジャンルを消さない。**
+        1ジャンルに10分かかるので、全件を1回で回しきれないことがある。
+        """
+        done = {row['slug']: row for row in result}
+        rows = []
+        for genre in GENRES:
+            row = done.get(genre['slug']) or previous.get(genre['slug'])
+            if row:
+                rows.append(row)
+        return rows
 
     if links_only:
         if not previous:
@@ -621,11 +641,12 @@ def main() -> None:
 
         print(f"    合計   : 作品{sum(works.values()):,}件 → 出演者 {len(people):,}人", flush=True)
 
-        write(output, result)   # ジャンルごとに書き出す。途中で止まっても残る。
+        write(output, merged_rows())   # ジャンルごとに書き出す。途中で止まっても残る。
 
-    write(output, result)
+    rows = merged_rows()
+    write(output, rows)
     print()
-    print(f'{len(result)}ジャンルを書き出しました → {output}')
+    print(f'{len(rows)}ジャンルを書き出しました（今回取り直したのは {len(result)}）→ {output}')
 
 
 main()
