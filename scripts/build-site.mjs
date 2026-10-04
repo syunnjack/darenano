@@ -956,6 +956,28 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         .join('')}</tbody></table>`
     : '<p class="thin">この方は、名前と読み以外の情報が出典元で公開されていません。確認できないことは書かない方針のため、掲載していません。</p>'
 
+  // **1ページに貼るアフィリエイトリンクの数を、各社この本数までにする。**
+  // 2026-10-04 時点で1ページあたり平均22.6本あり、全体で約134万本だった。
+  // 見ているのは人ではなくクローラで、4社あわせて週 約7,400クリック・成果0。
+  // **数を並べても成果にならない。** 選びやすさの面でも、絞ったほうがよい。
+  const WORKS_PER_SERVICE = 3
+
+  // **作品データが無いページからは、アフィリエイトリンクを出さない。**
+  // 2026-10-04 に測った結果、66,563ページのうち28日間で検索表示があったのは
+  // 657ページ（1.0%）だけだった。残りは収益ゼロのまま、リンクだけがクローラに
+  // 踏まれていて、4社あわせて週 約7,400クリック・成果0 になっていた。
+  // 成果0のまま大量クリックが続くと、ASP側で不正クリックと判断される。
+  // **売る物が無いページに広告を置かない。** ページ自体は消さない（URLは維持する）。
+  const hasWorks = Boolean(
+    fanzaWorks?.w?.length
+    || person.duga?.recent?.length
+    || person.duga?.productId
+    || sokmilWorks?.w?.length
+    || dtiWorks?.w?.length
+    || person.b10f?.productUrl
+    || Object.values(moreWorks ?? {}).some((w) => w?.length),
+  )
+
   // 出演作品へのリンク。FANZA は API が一覧のURLを返すのでそれを使う。
   // DUGA は返さないため、氏名での検索へアフィリエイトの転送を通して繋ぐ。
   const works = []
@@ -997,6 +1019,9 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
     works.push([`B10F で最新の出演作品を見る${opened}`, person.b10f.productUrl])
   }
 
+  // 作品データが無いページでは、ボタン列ごと出さない
+  if (!hasWorks) works.length = 0
+
   const worksHtml = works.length
     ? `<p class="works">${works
         .map(([label, url]) => `<a class="button" href="${escapeHtml(url)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(label)}</a>`)
@@ -1014,8 +1039,8 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const fanzaWorksHtml = fanzaWorks?.w?.length
     ? `<section class="work-block">
         <h2>FANZA での出演作品<span class="pr">広告</span></h2>
-        ${renderWorkList(fanzaWorks.w)}
-        <p class="confirmed">FANZA の動画（videoa）に収録されている ${fanzaWorks.n.toLocaleString('ja-JP')} 作品のうち、新しい ${fanzaWorks.w.length} 本です。${
+        ${renderWorkList(fanzaWorks.w.slice(0, WORKS_PER_SERVICE))}
+        <p class="confirmed">FANZA の動画（videoa）に収録されている ${fanzaWorks.n.toLocaleString('ja-JP')} 作品のうち、新しい ${Math.min(fanzaWorks.w.length, WORKS_PER_SERVICE)} 本です。${
           person.fanza?.listUrl
             ? `<a href="${escapeHtml(withCurrentId(person.fanza.listUrl))}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
             : ''
@@ -1028,7 +1053,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
     .filter(([kind, works]) => MORE_FLOORS[kind] && works?.length)
     .map(([kind, works]) => `<section class="work-block">
         <h2>FANZA ${escapeHtml(MORE_FLOORS[kind].label)}での出演作品<span class="pr">広告</span></h2>
-        ${renderMoreWorks(kind, works)}
+        ${renderMoreWorks(kind, works.slice(0, WORKS_PER_SERVICE))}
       </section>`)
     .join('')
 
@@ -1036,8 +1061,8 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const dugaWorksHtml = person.duga?.recent?.length
     ? `<section class="work-block">
         <h2>DUGA での出演作品<span class="pr">広告</span></h2>
-        ${renderDugaWorks(person.duga.recent)}
-        <p class="confirmed">DUGA の作品データCSVに収録されている ${(person.duga.works ?? 0).toLocaleString('ja-JP')} 作品のうち、公開の新しい ${person.duga.recent.length} 本です。</p>
+        ${renderDugaWorks(person.duga.recent.slice(0, WORKS_PER_SERVICE))}
+        <p class="confirmed">DUGA の作品データCSVに収録されている ${(person.duga.works ?? 0).toLocaleString('ja-JP')} 作品のうち、公開の新しい ${Math.min(person.duga.recent.length, WORKS_PER_SERVICE)} 本です。</p>
       </section>`
     : ''
 
@@ -1045,8 +1070,8 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const sokmilWorksHtml = sokmilWorks?.w?.length
     ? `<section class="work-block">
         <h2>ソクミル での出演作品<span class="pr">広告</span></h2>
-        ${renderSokmilWorks(sokmilWorks.w)}
-        <p class="confirmed">ソクミルに収録されている ${sokmilWorks.n.toLocaleString('ja-JP')} 作品のうち、配信の新しい ${sokmilWorks.w.length} 本です。${
+        ${renderSokmilWorks(sokmilWorks.w.slice(0, WORKS_PER_SERVICE))}
+        <p class="confirmed">ソクミルに収録されている ${sokmilWorks.n.toLocaleString('ja-JP')} 作品のうち、配信の新しい ${Math.min(sokmilWorks.w.length, WORKS_PER_SERVICE)} 本です。${
           person.sokmil?.affiliateURL
             ? `<a href="${escapeHtml(person.sokmil.affiliateURL)}" target="_blank" rel="nofollow sponsored noopener">すべての出演作品を見る</a>`
             : ''
@@ -1059,7 +1084,7 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
     ? `<section class="work-block">
         <h2>無修正サイトでの出演作品<span class="pr">広告</span></h2>
         <p class="confirmed">DTI CASH が扱う配信サイトに、この方の名前で ${dtiWorks.n.toLocaleString('ja-JP')} 作品が収録されています。<strong>いずれも無修正の作品です。</strong>配信元は作品ごとに書いてあり、リンク先は各サイトの作品ページです。</p>
-        ${renderDtiWorks(dtiWorks.w)}
+        ${renderDtiWorks(dtiWorks.w.slice(0, WORKS_PER_SERVICE))}
       </section>`
     : ''
 
@@ -1067,8 +1092,8 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
   const b10fWorksHtml = person.b10f?.recent?.length
     ? `<section class="work-block">
         <h2>B10F での出演作品<span class="pr">広告</span></h2>
-        ${renderB10fWorks(person.b10f.recent)}
-        <p class="confirmed">B10F の作品データCSVに収録されている ${(person.b10f.works ?? 0).toLocaleString('ja-JP')} 作品のうち、配信の新しい ${person.b10f.recent.length} 本です。</p>
+        ${renderB10fWorks(person.b10f.recent.slice(0, WORKS_PER_SERVICE))}
+        <p class="confirmed">B10F の作品データCSVに収録されている ${(person.b10f.works ?? 0).toLocaleString('ja-JP')} 作品のうち、配信の新しい ${Math.min(person.b10f.recent.length, WORKS_PER_SERVICE)} 本です。</p>
       </section>`
     : ''
 
@@ -1147,13 +1172,13 @@ function renderPage(person, { profile, sources, related, indexable, fanzaWorks, 
         <p class="confirmed">各サービスの API が公開している情報をそのまま載せています。取得時期は<a href="/actress/">五十音索引</a>に記載しています。</p>
       </section>
       ${historyHtml}
-      ${renderBanner('actress')}
+      ${hasWorks ? renderBanner('actress') : ''}
       <section id="ugc" class="ugc"
                data-slug="${escapeHtml(person.slug)}"
                data-api="${escapeHtml(SUPABASE_URL)}"
                data-key="${escapeHtml(SUPABASE_ANON_KEY)}"></section>
       ${relatedHtml}
-      ${renderFanzaServices()}
+      ${hasWorks ? renderFanzaServices() : ''}
       <footer>
         <p class="adult">このページは18歳未満の方に向けたものではありません。</p>
         <p>掲載内容の訂正・削除のご依頼は <a href="mailto:${CONTACT}">${CONTACT}</a> へご連絡ください。確認のうえ対応します。</p>
